@@ -1,0 +1,49 @@
+"""Static contract checks for the add-on manifest, translations and ingress adapter."""
+import pathlib
+import re
+import sys
+
+import yaml
+
+ADDON = pathlib.Path(__file__).resolve().parent.parent
+config = yaml.safe_load((ADDON / "config.yaml").read_text())
+nginx = (ADDON / "rootfs/etc/nginx/nginx.conf").read_text()
+common = (ADDON / "rootfs/etc/nginx/woow/proxy-common.conf").read_text()
+dockerfile = (ADDON / "Dockerfile").read_text()
+
+# s6-overlay in the base image only starts when it is PID 1.
+assert config["init"] is False
+assert re.fullmatch(r"\d+\.\d+\.\d+", config["version"]), "plain X.Y.Z only"
+assert config["arch"] == ["amd64"]
+assert config["ingress"] is True and config["ingress_port"] == 9120 and config["ingress_stream"] is True
+assert config["ports"] == {"8642/tcp": 8642, "9119/tcp": 9119, "8644/tcp": 8644}
+assert "8642" not in config["watchdog"], "the gateway can be stopped from the dashboard"
+assert config["panel_title"] == "Hermes"
+assert "homeassistant_api" not in config
+assert {"type": "addon_config", "path": "/opt/data", "read_only": False} in config["map"]
+# Supervisor's backup filter only prunes a directory when the directory itself matches.
+assert all(not p.endswith("/**") for p in config["backup_exclude"])
+
+for lang in ("en", "zh-Hant"):
+    tr = yaml.safe_load((ADDON / f"translations/{lang}.yaml").read_text())
+    assert set(tr["configuration"]) == set(config["schema"]), lang
+    assert set(tr["network"]) == set(config["ports"]), lang
+
+# Hermes prefixes Location headers itself; proxy_redirect would double-prefix.
+assert not re.search(r"^\s*proxy_redirect\b", nginx, re.M)
+assert "allow 172.30.32.2;" in nginx and "deny all;" in nginx
+assert "X-Forwarded-Prefix $safe_ingress_path" in common
+# A location with its own proxy_set_header does not inherit the server's, so every
+# proxied location must include the shared set.
+for block in re.findall(r"location[^{]*\{(.*?)\n        \}", nginx, re.S):
+    if "proxy_pass" in block:
+        assert "include /etc/nginx/woow/proxy-common.conf;" in block, block[:80]
+
+# Every rewritten anchor is proven in the image at build time.
+for anchor in re.findall(r"sub_filter\s+(['\"])(.*?)\1\s", nginx):
+    text = anchor[1]
+    if text in ("</head>", "url: '/openapi.json'"):
+        continue
+    assert text in dockerfile.replace("\\", ""), f"no build proof for anchor {text!r}"
+
+print("config contract: ok")
