@@ -45,7 +45,9 @@ secret webhook_secret webhook_secret WEBHOOK_SECRET 48
 # restart logs everyone out.
 secret basic_auth_secret "" HERMES_DASHBOARD_BASIC_AUTH_SECRET 32
 
-supervisor() { curl -fsS -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" "$@"; }
+# Empty outside Home Assistant (local tests): every Supervisor call then just fails.
+SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN:-}
+supervisor() { [[ -n $SUPERVISOR_TOKEN ]] && curl -fsS -H "Authorization: Bearer ${SUPERVISOR_TOKEN}" "$@"; }
 
 # MCP OAuth redirects back to this URL. Never derived from the ingress path: HA's
 # ingress session cookie is SameSite=Strict, so a cross-site OAuth return would 401.

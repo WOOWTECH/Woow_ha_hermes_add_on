@@ -11,6 +11,8 @@ TOKEN=testtoken0123456789abcdefghijklmnopqrstuvwxy
 mkdir -p "$OUT/data"
 
 cleanup() {
+    podman logs woow-hermes-test-addon >"$OUT/addon.log" 2>&1 || true
+    podman logs woow-hermes-test-ingress >"$OUT/ingress.log" 2>&1 || true
     podman rm -f woow-hermes-test-addon woow-hermes-test-ingress >/dev/null 2>&1 || true
     podman volume rm -f woow-hermes-test-home >/dev/null 2>&1 || true
     podman network rm -f "$NET" >/dev/null 2>&1 || true
@@ -37,6 +39,5 @@ curl -fsS -o /dev/null http://127.0.0.1:19119/login
 
 node "$HERE/walk.js" direct http://127.0.0.1:19119/ "$OUT/direct" "$OUT/.pw"
 node "$HERE/walk.js" ingress "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/ingress" "$OUT/.pw"
-podman logs woow-hermes-test-addon >"$OUT/addon.log" 2>&1 || true
 echo "--- direct";  cat "$OUT/direct/summary.json"
 echo "--- ingress"; cat "$OUT/ingress/summary.json"
