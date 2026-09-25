@@ -27,9 +27,11 @@ jq -n --arg pw "$PW" '{dashboard_username: "admin", dashboard_password: $pw, env
 podman network create --subnet 172.30.32.0/23 "$NET" >/dev/null
 podman run -d --name woow-hermes-test-addon --network "$NET" --ip 172.30.33.10 --memory=3g \
     -v "$OUT/data:/data:Z" -v woow-hermes-test-home:/opt/data -p 127.0.0.1:19119:9119 "$IMAGE" >/dev/null
+# HA ingress stand-in at the Supervisor's address, run with the image's own
+# aiohttp. Like HA, it hands the browser a 1000 for every WebSocket close.
 podman run -d --name woow-hermes-test-ingress --network "$NET" --ip 172.30.32.2 \
-    -v "$HERE/ha-ingress-emulator.conf:/etc/nginx/nginx.conf:ro,Z" -p 127.0.0.1:18080:8080 \
-    docker.io/library/nginx:alpine >/dev/null
+    -v "$HERE/ha_ingress_emulator.py:/emulator.py:ro,Z" -p 127.0.0.1:18080:8080 \
+    --entrypoint /opt/hermes/.venv/bin/python "$IMAGE" /emulator.py 8080 http://172.30.33.10:9120 >/dev/null
 
 for _ in $(seq 1 90); do
     curl -fsS -o /dev/null http://127.0.0.1:19119/login && break
@@ -51,6 +53,10 @@ if [[ -z ${SKIP_WALK:-} ]]; then
     node "$HERE/walk.js" direct http://127.0.0.1:19119/ "$OUT/direct" "$OUT/.pw"
     node "$HERE/walk.js" ingress "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/ingress" "$OUT/.pw"
 fi
+for base in http://127.0.0.1:19119/ "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/"; do
+    KILL_TUI="podman exec woow-hermes-test-addon pkill -f ui-tui/dist" \
+        node "$HERE/test-chat-close-codes.js" "$base" "$OUT/.pw" "$OUT" | tee -a "$OUT/chat-close-codes.txt"
+done
 node "$HERE/test-cookie-isolation.js" http://127.0.0.1:19119/ "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/.pw" \
     | tee "$OUT/cookie-isolation.txt"
 if [[ -z ${SKIP_WALK:-} ]]; then

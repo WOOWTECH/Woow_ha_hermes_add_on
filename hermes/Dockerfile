@@ -92,6 +92,7 @@ RUN set -e; \
     grep -q 'iss mismatch tolerated' /opt/hermes/.venv/lib/python*/site-packages/mcp/client/auth/utils.py; \
     nginx -V 2>&1 | grep -q -- '--with-http_sub_module'; \
     test -f /usr/lib/nginx/modules/ngx_http_js_module.so; \
+    /opt/hermes/.venv/bin/python -c 'import aiohttp' && /opt/hermes/.venv/bin/python -c 'import ast; ast.parse(open("/opt/woow/ws_relay.py").read())'; \
     nginx -t -c /etc/nginx/nginx.conf; \
     command -v tmux jq officecli; \
     test -x /usr/local/bin/hermes; \

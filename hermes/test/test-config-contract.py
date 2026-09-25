@@ -46,4 +46,13 @@ for anchor in re.findall(r"sub_filter\s+(['\"])(.*?)\1\s", nginx):
         continue
     assert text in dockerfile.replace("\\", ""), f"no build proof for anchor {text!r}"
 
+# The relay behind ingress WebSockets runs as an s6 service, and nginx routes
+# WebSocket upgrades on /api/ to it.
+s6 = ADDON / "rootfs/etc/s6-overlay/s6-rc.d"
+assert (s6 / "woow-wsrelay/type").read_text().strip() == "longrun"
+assert (s6 / "user/contents.d/woow-wsrelay").exists()
+assert "/opt/woow/ws_relay.py 9121" in (s6 / "woow-wsrelay/run").read_text()
+assert '"~*^websocket$" 127.0.0.1:9121;' in nginx
+assert "location = /__woow/wsclose" in nginx
+
 print("config contract: ok")
