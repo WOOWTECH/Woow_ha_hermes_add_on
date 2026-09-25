@@ -1,5 +1,6 @@
 // A reload keeps the current page, on the LAN port and in the sidebar.
 //   node test-reload-route.js direct <base/> <password file>
+//   node test-reload-route.js root <ingress base/> <password file> [ingress_session]
 //   node test-reload-route.js panel <panel URL> <ingress base/> <password file> [ingress_session]
 // "panel" loads the dashboard in an iframe the way the HA panel does, moves to
 // Skills inside it, reloads the whole panel page (F5 in Home Assistant) and
@@ -27,13 +28,18 @@ async function goToSkills(frame) {
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
   const page = await ctx.newPage();
   let after;
-  if (mode === 'direct') {
-    const [base, pwFile] = args;
+  if (mode === 'direct' || mode === 'root') {
+    const [base, pwFile, session] = args;
+    if (session) {
+      await ctx.addCookies([{ name: 'ingress_session', value: session, domain: new URL(base).hostname, path: '/api/hassio_ingress/' }]);
+    }
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     await signIn(page, fs.readFileSync(pwFile, 'utf8').trim());
     await page.waitForURL((u) => !/\/login/.test(new URL(u).pathname), { timeout: 30000 });
     await goToSkills(page);
-    await page.reload({ waitUntil: 'domcontentloaded' });
+    // "root": what the HA panel does on a reload, in the same tab.
+    if (mode === 'root') await page.goto(base, { waitUntil: 'domcontentloaded' });
+    else await page.reload({ waitUntil: 'domcontentloaded' });
     await page.waitForTimeout(4000);
     after = new URL(page.url()).pathname;
   } else {
