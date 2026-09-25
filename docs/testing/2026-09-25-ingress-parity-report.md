@@ -1,7 +1,7 @@
 # Woow Hermes Agent add-on：HA 側邊欄與區網直連功能一致性測試報告
 
 - 日期：2026-09-24 至 2026-09-25
-- 受測版本：add-on 0.1.0 → **0.1.3**（Hermes Agent v2026.8.31，dashboard 0.21.0）
+- 受測版本：add-on 0.1.0 → **0.1.4**（Hermes Agent v2026.8.31，dashboard 0.21.0）
 - 環境：正式 HAOS（amd64，HA Core 2026.7.2，Supervisor 2026.09.2），以本地測試版 add-on `local_woow_hermes_test` 安裝
 - 模型：使用者的 ChatGPT 登入（provider `openai-codex`，model `gpt-5.5`）
 
@@ -15,10 +15,10 @@
 
 ## 1 結論
 
-**0.1.3 已達成需求：在 HA 側邊欄操作 dashboard，功能與區網直連 `:9119` 一致。**
+**0.1.4 已達成需求：在 HA 側邊欄操作 dashboard，功能與區網直連 `:9119` 一致。**
 
-- 測試過程找到 7 項 add-on 造成的差異，全部已修正，並在正式機上驗證（見第 3 節）。
-- 還剩 1 項安全性差異（A6），是上游 Hermes 的問題，add-on 可以補強，待決定（見第 5 節）。
+- 測試過程找到 8 項 add-on 造成的差異，全部已修正，並在正式機上驗證（見第 3 節）。
+- 還剩 1 項安全性差異（A6），是上游 Hermes 的問題。依使用者決定暫不處理，已在 DOCS 提醒保留長隨機密碼（見第 5 節）。
 - 其餘不同之處屬於 HA Ingress 或 Cloudflare 本身的限制，已寫進 DOCS.md（見第 4 節）。
 
 | 測試 | 數量 |
@@ -53,6 +53,7 @@
 | 5 | Webhooks 頁顯示接收器「未啟用」 | 看起來 webhook 沒開 | 0.1.2：開機時把 `platforms.webhook` 寫進 config.yaml | ✅ `/api/webhooks` 回 `enabled: true` |
 | 6 | HA Ingress 把所有 WebSocket 關閉碼改成 1000 | 被其他分頁接手的聊天、agent 結束的聊天都顯示「session ended (code 1000)」 | 0.1.3：新增 `woow-wsrelay` 記錄 Hermes 真正的關閉碼，由 shim 還原 | ✅ 4409 和 4410 三條路徑相同 |
 | 7 | 從 podman 版沿用的安全政策從來沒有生效，卻寫入了「已套用」的標記 | 設定跟預期不同 | 0.1.3：依使用者決定維持上游預設，移除沒作用的程式碼，並更新文件 | ✅ `approvals.mode=smart`、`cron_mode=deny` |
+| 8 | 在 HA 頁面按 F5，側邊欄會回到 Sessions；直連重新整理則停在原頁 | 重新整理後要自己點回原本的頁面 | 0.1.4：shim 用 sessionStorage 記住這個分頁最後停留的頁面，HA 從首頁重建 iframe 時還原 | ✅ 三條路徑重新整理後都停在 `/skills` |
 
 每一項都先寫出能重現問題的測試（紅燈），修正後轉綠燈，最後在正式機上驗證。
 
@@ -60,7 +61,6 @@
 
 | 項目 | 說明 |
 |---|---|
-| 在 HA 頁面按 F5 會回到 Sessions | HA 每次都從面板首頁開 iframe，不記住 iframe 裡的頁面。直連重新整理會停在原頁。可以用 shim 記住最後的頁面來改善（見第 5 節）。 |
 | 兩邊要各自登入 | 這是 #4 修正的刻意設計，讓兩邊的 session 分開。 |
 | 經 Cloudflare 的限制 | 單一請求 body 最多 100 MB；大約 100 秒沒有輸出會回 524；速度受 WAN 影響，95 MB 上傳約 63 秒，區網約 12–15 秒。 |
 | 結尾沒有斜線的 ingress 網址 | HA Core 直接回 404。從側邊欄進入不會遇到。 |
@@ -70,12 +70,11 @@
 | 對外 port 綁在所有網卡上 | Supervisor 不能只綁一張網卡。不需要的 port 可在 add-on 的 Network 分頁停用。 |
 | Watchdog 和開機自動啟動 | HA 不會自動打開，安裝後要手動打開。 |
 
-## 5 待決定
+## 5 已知未處理的差異
 
-| 項目 | 說明 | 建議 |
+| 項目 | 說明 | 決定 |
 |---|---|---|
-| **A6 登入次數限制可繞過**（安全） | Hermes 以 `X-Forwarded-For` 的第一個值判斷來源 IP，所以在直連和經 Cloudflare 時，換一個標頭值就能繼續猜密碼。區網的 HA 會擋掉。 | 修：nginx 改用真實來源 IP，並對 Hermes 的 `_client_ip` 加建置時修補（做法比照現有的 `iss-*.py`）。三條路徑就都擋得住。 |
-| F5 回到 Sessions | 見第 4 節。 | 可選：在 shim 用 `sessionStorage` 記住最後的頁面，重新整理後自動回去。 |
+| **A6 登入次數限制可繞過**（安全） | Hermes 以 `X-Forwarded-For` 的第一個值判斷來源 IP，所以在直連和經 Cloudflare 時，換一個標頭值就能繼續猜密碼。區網的 HA 會擋掉。自動產生的密碼是 24 個隨機字元，猜不到。 | 暫不處理（2026-09-25）。DOCS 已提醒保留長隨機密碼。補強方法已記錄：nginx 改用真實來源 IP，並對 `_client_ip` 加建置時修補。 |
 
 ## 6 上游 Hermes 本身的問題（三條路徑都一樣）
 
