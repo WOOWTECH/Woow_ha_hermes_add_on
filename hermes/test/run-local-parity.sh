@@ -63,6 +63,9 @@ for base in http://127.0.0.1:19119/ "http://127.0.0.1:18080/api/hassio_ingress/$
     KILL_TUI="podman exec woow-hermes-test-addon pkill -f ui-tui/dist" \
         node "$HERE/test-chat-close-codes.js" "$base" "$OUT/.pw" "$OUT" | tee -a "$OUT/chat-close-codes.txt"
 done
+node "$HERE/test-reload-route.js" direct http://127.0.0.1:19119/ "$OUT/.pw" | tee -a "$OUT/reload-route.txt"
+node "$HERE/test-reload-route.js" panel http://127.0.0.1:18080/__ha_panel.html \
+    "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/.pw" | tee -a "$OUT/reload-route.txt"
 node "$HERE/test-cookie-isolation.js" http://127.0.0.1:19119/ "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/.pw" \
     | tee "$OUT/cookie-isolation.txt"
 if [[ -z ${SKIP_WALK:-} ]]; then

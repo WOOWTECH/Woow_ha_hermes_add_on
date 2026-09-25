@@ -67,7 +67,7 @@ const sandbox = {
   Request: class { constructor(u) { this.url = u; } },
   XMLHttpRequest: class { open() {} },
   PerformanceObserver: class { observe() {} },
-  location: { href: `${origin}${P}/chat`, origin, host: "ha.example.com" },
+  location: { href: `${origin}${P}/chat`, origin, host: "ha.example.com", pathname: `${P}/chat`, search: "", hash: "" },
   history: { pushState() {}, replaceState() {} },
   document: { currentScript: { src: `${origin}${P}/__woow/ingress-shim.js` } },
 };

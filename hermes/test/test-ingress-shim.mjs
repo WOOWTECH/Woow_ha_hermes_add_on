@@ -19,7 +19,7 @@ const window = {
 const sandbox = {
   window, URL, Request: FakeRequest, XMLHttpRequest: FakeXHR, console,
   PerformanceObserver: class { observe() {} },
-  location: { href: `${origin}${P}/sessions`, origin },
+  location: { href: `${origin}${P}/sessions`, origin, pathname: `${P}/sessions`, search: "", hash: "" },
   history: { pushState: (s, t, u) => pushed.push(u), replaceState: () => {} },
   document: { currentScript: { src: `${origin}${P}/__woow/ingress-shim.js` } },
 };

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4
+
+- Reloading the Home Assistant page (F5) keeps the sidebar on the page you were on, as a reload
+  does on the LAN port. It used to return to Sessions.
+- DOCS: keep a long random dashboard password (Hermes' login attempt limit can be sidestepped on
+  the LAN port).
+
 ## 0.1.3
 
 - The sidebar chat now ends the same way as on the LAN port. HA ingress turns every WebSocket

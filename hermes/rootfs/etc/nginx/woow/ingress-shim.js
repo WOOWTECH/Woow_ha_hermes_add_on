@@ -17,13 +17,55 @@
     } catch (e) {}
     return u;
   };
+  // Reloading the Home Assistant page recreates the panel's iframe at the
+  // ingress root, where the app starts on Sessions, while a reload on the LAN
+  // port stays on the current page. Remember the last page for this tab and go
+  // back to it before the app reads the URL. A new tab starts fresh, as on the
+  // LAN port; sign-in pages are never remembered.
+  var routeKey = "woow-ingress-route:" + P;
+  var storage = null;
+  try {
+    storage = window.sessionStorage;
+  } catch (e) {}
+  var currentRoute = function () {
+    return (location.pathname.slice(P.length) || "/") + location.search + location.hash;
+  };
+  var pathOf = function (route) {
+    return route.split(/[?#]/)[0];
+  };
+  var skipped = function (route) {
+    return pathOf(route) === "/" || /^\/(login|auth)(\/|$)/.test(pathOf(route));
+  };
+  var remember = function () {
+    if (!storage || location.pathname.indexOf(P + "/") !== 0) return;
+    var route = currentRoute();
+    if (skipped(route)) return;
+    try {
+      storage.setItem(routeKey, route);
+    } catch (e) {}
+  };
+  var nativeReplaceState = history.replaceState;
   ["pushState", "replaceState"].forEach(function (name) {
     var original = history[name];
     history[name] = function (state, title, url) {
       if (arguments.length > 2) arguments[2] = withSlash(url);
-      return original.apply(this, arguments);
+      var result = original.apply(this, arguments);
+      remember();
+      return result;
     };
   });
+  if (window.addEventListener) window.addEventListener("popstate", remember);
+  var saved = null;
+  try {
+    saved = storage && storage.getItem(routeKey);
+  } catch (e) {}
+  // Only the ingress root, where HA opens the panel; the app itself sends the
+  // root on to Sessions after this runs. Any other page was asked for.
+  if (saved && !skipped(saved) && pathOf(currentRoute()) === "/") {
+    nativeReplaceState.call(history, history.state, "", P + saved);
+  } else {
+    remember();
+  }
   // A few upstream call sites fetch root-absolute URLs without the base path
   // (session export, Swagger "Try it out"). Keep same-origin requests inside the
   // ingress prefix; URLs already under it are left alone.

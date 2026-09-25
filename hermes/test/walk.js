@@ -100,6 +100,10 @@ function classify(u) {
     currentPage = r;
     const target = new URL(r.replace(/^\//, ''), base).href;
     let status = null;
+    // The walk compares a fresh open of each page. In the sidebar the ingress
+    // root restores the tab's last page (a reload of the HA panel), which
+    // test-reload-route.js covers; start the root from a clean tab state.
+    if (r === '/') await page.evaluate(() => { try { sessionStorage.clear(); } catch (e) {} }).catch(() => {});
     try {
       const resp = await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 20000 });
       status = resp && resp.status();

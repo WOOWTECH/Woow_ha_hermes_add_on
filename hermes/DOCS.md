@@ -60,8 +60,6 @@ switch them on for you.
 
 - The sidebar and `http://<Home Assistant IP>:9119` keep separate logins. Signing in or out on one
   does not affect the other.
-- Reloading the Home Assistant page (F5) returns the sidebar to Sessions, because Home Assistant
-  always opens the panel at its start page. On the LAN port a reload stays on the current page.
 - The Webhooks page shows `http://localhost:8644/...`. Senders outside the add-on must use
   `http://<Home Assistant IP>:8644/webhooks/<route>` or the Cloudflare hostname.
 - Through Cloudflare, a single upload is limited to 100 MB. Upload larger files on the LAN.
@@ -76,6 +74,10 @@ API key, or a webhook route that triggers the agent can still run the commands t
 approval. The add-on removes the Supervisor token from
 the agent's environment. Home Assistant backups of this add-on contain its secrets and
 conversation history.
+
+Keep the generated dashboard password, or use an equally long random one. Hermes limits wrong
+login attempts per client address, but it takes that address from a header the client can set, so
+on the LAN port the limit can be sidestepped. A long random password cannot be guessed either way.
 
 ## Data
 
