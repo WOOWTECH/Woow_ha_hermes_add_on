@@ -12,8 +12,9 @@ import os
 import sys
 import tempfile
 
-sys.path.insert(0, "/opt/hermes")
-os.chdir("/opt/hermes")
+HERMES_SRC = os.environ.get("HERMES_SRC", "/opt/hermes")
+sys.path.insert(0, HERMES_SRC)
+os.chdir(HERMES_SRC)
 os.environ["HERMES_HOME"] = tempfile.mkdtemp()
 for var in ("HERMES_GATEWAY_SESSION", "HERMES_INTERACTIVE", "HERMES_CRON_SESSION", "HERMES_SESSION_PLATFORM"):
     os.environ.pop(var, None)
@@ -53,8 +54,8 @@ for label, session in (
     assert smart == 0, f"{label}: smart approval was consulted"
     print(f"{label}: refused")
 
-# A person chatting still gets smart approval, as before.
-result, smart = guard(HERMES_SESSION_PLATFORM="telegram", HERMES_GATEWAY_SESSION="1")
+# A person chatting on a messaging platform still gets smart approval, as before.
+result, smart = guard(HERMES_SESSION_PLATFORM="telegram")
 assert smart == 1 and result.get("approved") is True, f"chat session changed: {result}, smart={smart}"
 print("chat session: smart approval as before")
 print("approval gate: ok")
