@@ -100,6 +100,8 @@ RUN set -e; \
 
 ARG BUILD_VERSION=dev
 ENV WOOW_IMAGE_VERSION=${BUILD_VERSION}
+# Declared before FROM, so it has to be declared again to be used here.
+ARG HERMES_BASE
 ARG BUILD_ARCH
 LABEL io.hass.name="Woow Hermes Agent" \
       io.hass.type="addon" \
