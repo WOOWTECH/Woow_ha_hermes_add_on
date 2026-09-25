@@ -1,5 +1,5 @@
 // The chat must end the same way through the sidebar as on the LAN port.
-//   KILL_TUI='<command that kills the chat process>' \
+//   KILL_TUI='<command that kills the chat process>' [HA_INGRESS_SESSION=<real HA cookie>] \
 //   node test-chat-close-codes.js <base/> <password file> [screenshot dir]
 // Tab A opens /chat, tab B opens /chat in the same browser (same keep-alive
 // token) and takes it over: tab A must get 4409 and stay quiet. Then the
@@ -36,6 +36,11 @@ async function terminalText(page) {
 (async () => {
   const browser = await chromium.launch({ headless: true, executablePath: '/home/woowtech-ai-coder/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome' });
   const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
+  // Real HA: the HA ingress session cookie (from ha_ingress_session.py).
+  if (process.env.HA_INGRESS_SESSION) {
+    await ctx.addCookies([{ name: 'ingress_session', value: process.env.HA_INGRESS_SESSION,
+      domain: new URL(BASE).hostname, path: '/api/hassio_ingress/' }]);
+  }
   const a = await ctx.newPage();
   await a.goto(BASE, { waitUntil: 'domcontentloaded' });
   await a.fill('input[name=username]', 'admin');
