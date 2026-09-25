@@ -48,6 +48,12 @@ for _ in $(seq 1 60); do
 done
 echo "platforms.webhook.enabled: ${webhook}"
 [[ $webhook == true ]]
+# Upstream's approval defaults stay in place.
+hermes_get() { podman exec -u hermes woow-hermes-test-addon /opt/hermes/.venv/bin/hermes config get "$1" 2>&1 || true; }
+approvals=$(hermes_get approvals.mode)
+cron=$(hermes_get approvals.cron_mode)
+echo "approvals.mode: ${approvals}, approvals.cron_mode: ${cron}"
+[[ $approvals == smart && $cron == deny ]]
 
 if [[ -z ${SKIP_WALK:-} ]]; then
     node "$HERE/walk.js" direct http://127.0.0.1:19119/ "$OUT/direct" "$OUT/.pw"

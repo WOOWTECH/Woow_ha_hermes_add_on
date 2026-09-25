@@ -55,4 +55,12 @@ assert "/opt/woow/ws_relay.py 9121" in (s6 / "woow-wsrelay/run").read_text()
 assert '"~*^websocket$" 127.0.0.1:9121;' in nginx
 assert "location = /__woow/wsclose" in nginx
 
+# The agent runs with upstream's approval defaults (user decision, 2026-09-25):
+# the podman stack's sed policy never matched the v2026.8.31 config and must
+# not come back looking as if it did.
+provision = "\n".join(line for line in (ADDON / "rootfs/usr/local/bin/woow-provision").read_text().splitlines()
+                      if not line.lstrip().startswith("#"))
+for text in ("cron_mode: yolo", "mode: off", "hooks_auto_accept: true", "sed -i"):
+    assert text not in provision, f"woow-provision still carries the approval policy: {text!r}"
+
 print("config contract: ok")

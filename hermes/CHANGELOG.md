@@ -7,6 +7,9 @@
   "[session ended (code 1000)]", and the chat and live feeds did not reconnect after an add-on
   restart. A small relay in the add-on records how Hermes closed each ingress WebSocket, and the
   sidebar page restores that code.
+- The agent keeps Hermes' default approval settings. The podman stack's approval policy (no
+  approvals, cron yolo) never actually took effect on this Hermes version; the dead code that
+  looked like it applied it is removed, and the docs now describe the real behaviour.
 
 ## 0.1.2
 

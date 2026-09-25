@@ -53,9 +53,12 @@ response byte (use `stream: true` for long completions).
 
 ## Security
 
-The agent runs shell commands with the WOOWTECH policy from the podman stack (no approvals,
-cron in yolo mode). Anyone who can use the dashboard, the API key, or a webhook route that
-triggers the agent can run commands in this add-on. The add-on removes the Supervisor token from
+The agent runs shell commands with Hermes' default approval settings: low-risk commands run
+directly, risky ones (deleting files, installing packages, `sudo`, piping downloads into a shell)
+wait for you to approve them in the chat, and scheduled jobs refuse them because nobody is there to
+approve. You can change this under Config in the dashboard. Anyone who can use the dashboard, the
+API key, or a webhook route that triggers the agent can still run the commands that need no
+approval. The add-on removes the Supervisor token from
 the agent's environment. Home Assistant backups of this add-on contain its secrets and
 conversation history.
 
