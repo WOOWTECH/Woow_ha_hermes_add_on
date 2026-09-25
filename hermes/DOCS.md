@@ -51,6 +51,21 @@ Cloudflare limits apply to anything that goes through it, including the sidebar 
 Assistant itself is reached through a tunnel: 100 MB request bodies and 125 s until the first
 response byte (use `stream: true` for long completions).
 
+## After installing
+
+Turn on **Start on boot** and **Watchdog** on the add-on's Info tab. Home Assistant does not
+switch them on for you.
+
+## Known differences between the sidebar and the LAN port
+
+- The sidebar and `http://<Home Assistant IP>:9119` keep separate logins. Signing in or out on one
+  does not affect the other.
+- Reloading the Home Assistant page (F5) returns the sidebar to Sessions, because Home Assistant
+  always opens the panel at its start page. On the LAN port a reload stays on the current page.
+- The Webhooks page shows `http://localhost:8644/...`. Senders outside the add-on must use
+  `http://<Home Assistant IP>:8644/webhooks/<route>` or the Cloudflare hostname.
+- Through Cloudflare, a single upload is limited to 100 MB. Upload larger files on the LAN.
+
 ## Security
 
 The agent runs shell commands with Hermes' default approval settings: low-risk commands run
