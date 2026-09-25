@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5
+
+- Prebuilt image on GHCR (`ghcr.io/woowtech/woow-ha-hermes-amd64`): installs and updates pull it
+  instead of building on the Home Assistant host, which took about 23 minutes.
+- The official Hermes app icon as the add-on icon and logo.
+- Listed in the WOOWTECH add-on store (Woow_HA_App_Store).
+
 ## 0.1.4
 
 - Reloading the Home Assistant page (F5) keeps the sidebar on the page you were on, as a reload

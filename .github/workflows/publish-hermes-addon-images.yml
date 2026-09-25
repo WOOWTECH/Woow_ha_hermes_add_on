@@ -1,0 +1,130 @@
+name: Publish Hermes add-on image
+
+# A version bump in hermes/config.yaml on main builds and pushes the prebuilt
+# image Home Assistant installs, then creates the GitHub Release that
+# Woow_HA_App_Store syncs from (its mapping uses the latest Release, so the
+# store never points at a version whose image is missing).
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - hermes/config.yaml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: publish-hermes
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Unit tests
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install test dependencies
+        run: pip install pyyaml pillow "aiohttp==3.14.3"
+
+      - name: Run unit tests
+        working-directory: hermes
+        run: |
+          python3 test/test-config-contract.py
+          node test/test-ingress-shim.mjs
+          node test/test-ingress-shim-ws.mjs
+          node test/test-ingress-shim-route.mjs
+          node test/test-ingress-cookies.mjs
+          timeout 120 python3 test/test-ws-relay.py
+
+  publish:
+    name: Publish amd64 image
+    needs: test
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read the add-on version
+        id: addon
+        shell: bash
+        run: |
+          version="$(awk -F': ' '$1 == "version" { print $2; exit }' hermes/config.yaml)"
+          [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "version=${version}" >> "${GITHUB_OUTPUT}"
+          echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "${GITHUB_OUTPUT}"
+
+      - name: Skip a version that is already released
+        id: released
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.addon.outputs.version }}
+        run: |
+          if gh release view "v${VERSION}" >/dev/null 2>&1; then
+            echo "::notice::v${VERSION} is already released; its image is not rebuilt"
+            echo "done=true" >> "${GITHUB_OUTPUT}"
+          fi
+
+      # The base image is about 3 GB unpacked.
+      - name: Free disk space
+        if: steps.released.outputs.done != 'true'
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.released.outputs.done != 'true'
+
+      - uses: docker/login-action@v3
+        if: steps.released.outputs.done != 'true'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        if: steps.released.outputs.done != 'true'
+        uses: docker/build-push-action@v6
+        with:
+          context: ./hermes
+          file: ./hermes/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/woowtech/woow-ha-hermes-amd64:${{ steps.addon.outputs.version }}
+          build-args: |
+            BUILD_ARCH=amd64
+            BUILD_VERSION=${{ steps.addon.outputs.version }}
+            BUILD_DATE=${{ steps.addon.outputs.created }}
+            BUILD_REF=${{ github.sha }}
+            BUILD_REPOSITORY=${{ github.repository }}
+
+      # Home Assistant pulls without credentials. A new GHCR package can start
+      # out private; releasing then would publish a version nobody can install.
+      - name: Check the image is publicly pullable
+        if: steps.released.outputs.done != 'true'
+        env:
+          VERSION: ${{ steps.addon.outputs.version }}
+        run: |
+          docker logout ghcr.io
+          if ! docker manifest inspect "ghcr.io/woowtech/woow-ha-hermes-amd64:${VERSION}" >/dev/null; then
+            echo "::error::ghcr.io/woowtech/woow-ha-hermes-amd64:${VERSION} is not publicly pullable. Make the package public (GitHub > Packages > woow-ha-hermes-amd64 > Package settings > Change visibility), then re-run this workflow."
+            exit 1
+          fi
+
+      - name: Create the GitHub Release
+        if: steps.released.outputs.done != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.addon.outputs.version }}
+        run: |
+          awk -v v="## ${VERSION}" '$0 == v { on = 1; next } /^## / && on { exit } on' hermes/CHANGELOG.md > notes.md
+          gh release create "v${VERSION}" --target "${GITHUB_SHA}" --title "${VERSION}" --notes-file notes.md

@@ -1,8 +1,10 @@
 name: Woow Hermes Agent
-version: 0.1.4
+version: 0.1.5
 slug: woow-hermes
 description: Hermes Agent (NousResearch) with the dashboard in the HA sidebar and on the LAN, plus the OpenAI-compatible API and webhooks for Cloudflare Tunnel
 url: https://github.com/WOOWTECH/Woow_ha_hermes_add_on
+# Prebuilt by .github/workflows/publish-hermes-addon-images.yml.
+image: ghcr.io/woowtech/woow-ha-hermes-{arch}
 arch:
   - amd64
 # The base image runs s6-overlay only when its entrypoint is PID 1.

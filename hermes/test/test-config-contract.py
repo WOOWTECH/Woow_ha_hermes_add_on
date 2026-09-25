@@ -63,4 +63,15 @@ provision = "\n".join(line for line in (ADDON / "rootfs/usr/local/bin/woow-provi
 for text in ("cron_mode: yolo", "mode: off", "hooks_auto_accept: true", "sed -i"):
     assert text not in provision, f"woow-provision still carries the approval policy: {text!r}"
 
+# Home Assistant pulls the prebuilt image the publish workflow pushes.
+workflow = (ADDON.parent / ".github/workflows/publish-hermes-addon-images.yml").read_text()
+assert config["image"] == "ghcr.io/woowtech/woow-ha-hermes-{arch}"
+assert "ghcr.io/woowtech/woow-ha-hermes-amd64:${{ steps.addon.outputs.version }}" in workflow
+assert config["arch"] == ["amd64"] and "linux/amd64" in workflow
+
+# Store listing artwork: the official Hermes app icon.
+from PIL import Image
+assert Image.open(ADDON / "icon.png").size == (128, 128)
+assert Image.open(ADDON / "logo.png").size == (400, 400)
+
 print("config contract: ok")
