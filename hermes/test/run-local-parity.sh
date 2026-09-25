@@ -38,11 +38,12 @@ done
 curl -fsS -o /dev/null http://127.0.0.1:19119/login
 
 # Boot provisioning: the Webhooks page reads platforms.webhook from config.yaml.
+# Poll the value itself: the log's "done" line comes before this step runs.
 for _ in $(seq 1 60); do
-    podman logs woow-hermes-test-addon 2>&1 | grep -q '^\[woow-provision\] done' && break
+    webhook=$(podman exec -u hermes woow-hermes-test-addon /opt/hermes/.venv/bin/hermes config get platforms.webhook.enabled 2>&1 || true)
+    [[ $webhook == true ]] && break
     sleep 5
 done
-webhook=$(podman exec -u hermes woow-hermes-test-addon /opt/hermes/.venv/bin/hermes config get platforms.webhook.enabled 2>&1 || true)
 echo "platforms.webhook.enabled: ${webhook}"
 [[ $webhook == true ]]
 
