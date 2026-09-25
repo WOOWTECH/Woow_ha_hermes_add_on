@@ -107,6 +107,17 @@ jobs:
             BUILD_REF=${{ github.sha }}
             BUILD_REPOSITORY=${{ github.repository }}
 
+      # Unattended runs must not auto-approve dangerous commands (own patch in
+      # hermes/patches). A failure here stops the Release, so the store never
+      # offers this version.
+      - name: Check the approval gate in the built image
+        if: steps.released.outputs.done != 'true'
+        env:
+          VERSION: ${{ steps.addon.outputs.version }}
+        run: |
+          docker run --rm -v "${PWD}/hermes/test:/t:ro" --entrypoint /opt/hermes/.venv/bin/python \
+            "ghcr.io/woowtech/woow-ha-hermes-amd64:${VERSION}" /t/test-approval-gate.py
+
       # Home Assistant pulls without credentials. A new GHCR package can start
       # out private; releasing then would publish a version nobody can install.
       - name: Check the image is publicly pullable
