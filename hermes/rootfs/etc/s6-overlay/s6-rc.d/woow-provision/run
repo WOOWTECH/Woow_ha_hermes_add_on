@@ -10,4 +10,14 @@ if /usr/local/bin/woow-provision --wait 600; then
 else
     echo "[woow-provision] failed; it runs again on the next start" >&2
 fi
+
+# The gateway turns the webhook receiver on from WEBHOOK_ENABLED, but the
+# dashboard's Webhooks page and `hermes webhook` read platforms.webhook in
+# config.yaml. Mirror it once; a value set later in the dashboard is kept.
+hermes_cli() { s6-setuidgid hermes /opt/hermes/.venv/bin/hermes "$@"; }
+if hermes_cli config get platforms.webhook.enabled 2>/dev/null | grep -q '^Config key not set'; then
+    hermes_cli config set platforms.webhook.enabled true >/dev/null \
+        && hermes_cli config set platforms.webhook.extra.port "${WEBHOOK_PORT:-8644}" >/dev/null \
+        && echo "[woow-provision] enabled platforms.webhook in config.yaml"
+fi
 exec sleep infinity
