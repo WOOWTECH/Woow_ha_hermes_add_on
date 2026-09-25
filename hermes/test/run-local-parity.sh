@@ -37,6 +37,15 @@ for _ in $(seq 1 90); do
 done
 curl -fsS -o /dev/null http://127.0.0.1:19119/login
 
+# Boot provisioning: the Webhooks page reads platforms.webhook from config.yaml.
+for _ in $(seq 1 60); do
+    podman logs woow-hermes-test-addon 2>&1 | grep -q '^\[woow-provision\] done' && break
+    sleep 5
+done
+webhook=$(podman exec -u hermes woow-hermes-test-addon /opt/hermes/.venv/bin/hermes config get platforms.webhook.enabled 2>&1 || true)
+echo "platforms.webhook.enabled: ${webhook}"
+[[ $webhook == true ]]
+
 if [[ -z ${SKIP_WALK:-} ]]; then
     node "$HERE/walk.js" direct http://127.0.0.1:19119/ "$OUT/direct" "$OUT/.pw"
     node "$HERE/walk.js" ingress "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/ingress" "$OUT/.pw"

@@ -15,7 +15,8 @@ fi
 # dashboard's Webhooks page and `hermes webhook` read platforms.webhook in
 # config.yaml. Mirror it once; a value set later in the dashboard is kept.
 hermes_cli() { s6-setuidgid hermes /opt/hermes/.venv/bin/hermes "$@"; }
-if hermes_cli config get platforms.webhook.enabled 2>/dev/null | grep -q '^Config key not set'; then
+# `config get` reports a missing key on stderr.
+if hermes_cli config get platforms.webhook.enabled 2>&1 | grep -q '^Config key not set'; then
     hermes_cli config set platforms.webhook.enabled true >/dev/null \
         && hermes_cli config set platforms.webhook.extra.port "${WEBHOOK_PORT:-8644}" >/dev/null \
         && echo "[woow-provision] enabled platforms.webhook in config.yaml"

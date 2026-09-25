@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2
+
+- Fix: `platforms.webhook` was never written to config.yaml in 0.1.1, so the Webhooks page still
+  showed the receiver as disabled.
+
 ## 0.1.1
 
 - Sidebar and LAN port keep separate Hermes sessions: a login on `http://<ha-ip>:9119` no longer
