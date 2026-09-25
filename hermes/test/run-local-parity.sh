@@ -37,7 +37,13 @@ for _ in $(seq 1 90); do
 done
 curl -fsS -o /dev/null http://127.0.0.1:19119/login
 
-node "$HERE/walk.js" direct http://127.0.0.1:19119/ "$OUT/direct" "$OUT/.pw"
-node "$HERE/walk.js" ingress "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/ingress" "$OUT/.pw"
-echo "--- direct";  cat "$OUT/direct/summary.json"
-echo "--- ingress"; cat "$OUT/ingress/summary.json"
+if [[ -z ${SKIP_WALK:-} ]]; then
+    node "$HERE/walk.js" direct http://127.0.0.1:19119/ "$OUT/direct" "$OUT/.pw"
+    node "$HERE/walk.js" ingress "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/ingress" "$OUT/.pw"
+fi
+node "$HERE/test-cookie-isolation.js" http://127.0.0.1:19119/ "http://127.0.0.1:18080/api/hassio_ingress/$TOKEN/" "$OUT/.pw" \
+    | tee "$OUT/cookie-isolation.txt"
+if [[ -z ${SKIP_WALK:-} ]]; then
+    echo "--- direct";  cat "$OUT/direct/summary.json"
+    echo "--- ingress"; cat "$OUT/ingress/summary.json"
+fi

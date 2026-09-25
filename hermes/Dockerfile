@@ -18,7 +18,7 @@ ARG OFFICECLI_SHA256=00028af3db48678fc9ff6c8f9e70fa4c150dcee2b43ed85254afc8f4a48
 ARG SUPERPOWERS_REF=b36e0829c6d0140e93cfef2ca599b1b07d4a7797
 
 RUN apt-get update \
- && apt-get install -y --no-install-recommends tmux nginx jq \
+ && apt-get install -y --no-install-recommends tmux nginx libnginx-mod-http-js jq \
  && rm -rf /var/lib/apt/lists/* /etc/nginx/sites-enabled /etc/nginx/conf.d \
  && ln -sf /opt/hermes/.venv/bin/hermes /usr/local/bin/hermes \
  && rm -f /usr/local/bin/argocd /usr/local/bin/helm /usr/bin/docker \
@@ -91,6 +91,7 @@ RUN set -e; \
     grep -q 'iss: Optional\[str\] = None' /opt/hermes/hermes_cli/web_routers/mcp.py; \
     grep -q 'iss mismatch tolerated' /opt/hermes/.venv/lib/python*/site-packages/mcp/client/auth/utils.py; \
     nginx -V 2>&1 | grep -q -- '--with-http_sub_module'; \
+    test -f /usr/lib/nginx/modules/ngx_http_js_module.so; \
     nginx -t -c /etc/nginx/nginx.conf; \
     command -v tmux jq officecli; \
     test -x /usr/local/bin/hermes; \
