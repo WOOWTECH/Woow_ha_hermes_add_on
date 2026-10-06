@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "repository": "WOOWTECH/Woow_ha_hermes_add_on",
+  "components": {
+    "woow-hermes": {
+      "id": "woow-hermes",
+      "name": "Woow Hermes Agent",
+      "version": "0.1.6",
+      "repository": "WOOWTECH/Woow_ha_hermes_add_on",
+      "source_sha": "38e6eafa20ab635e71195b7d08303c2267d77207",
+      "source_path": "hermes",
+      "config_file": "config.yaml",
+      "config_sha256": "sha256:47e7bc0cfd943a6b178abd207967bb780085c83680b679cfc04305e73688e348",
+      "archive_sha256": "sha256:d9a112e5d3310c7a1556f9e3c58a40c2ee00df5038838c51bbbf70d0ce99cddf",
+      "context_fingerprint": "sha256:9e38f19c1358a0c6716867b865dc7d5cc6b005ae895f26941d1fda671fcd8a1f",
+      "material_fingerprint": "sha256:91fe702f42047a0138c2fcb64b4b7d42b2763a25d3bd3a099f72048574329902",
+      "architectures": [
+        "amd64"
+      ],
+      "config": {
+        "name": "Woow Hermes Agent",
+        "version": "0.1.6",
+        "slug": "woow-hermes",
+        "description": "Hermes Agent (NousResearch) with the dashboard in the HA sidebar and on the LAN, plus the OpenAI-compatible API and webhooks for Cloudflare Tunnel",
+        "url": "https://github.com/WOOWTECH/Woow_ha_hermes_add_on",
+        "image": "ghcr.io/woowtech/woow-ha-hermes-{arch}",
+        "arch": [
+          "amd64"
+        ],
+        "init": false,
+        "startup": "application",
+        "boot": "auto",
+        "timeout": 60,
+        "hassio_api": true,
+        "ingress": true,
+        "ingress_port": 9120,
+        "ingress_stream": true,
+        "panel_icon": "mdi:robot-outline",
+        "panel_title": "Hermes",
+        "panel_admin": true,
+        "webui": "http://[HOST]:[PORT:9119]",
+        "watchdog": "tcp://[HOST]:[PORT:9119]",
+        "map": [
+          {
+            "type": "addon_config",
+            "path": "/opt/data",
+            "read_only": false
+          },
+          {
+            "type": "media",
+            "read_only": false
+          }
+        ],
+        "backup": "cold",
+        "backup_exclude": [
+          "**/logs",
+          "**/lazy-packages",
+          "**/.cache",
+          "**/.npm"
+        ],
+        "ports": {
+          "8642/tcp": 8642,
+          "9119/tcp": 9119,
+          "8644/tcp": 8644
+        },
+        "ports_description": {
+          "8642/tcp": "Gateway (OpenAI-compatible API)",
+          "9119/tcp": "Dashboard and chat terminal",
+          "8644/tcp": "Webhook receiver"
+        },
+        "options": {
+          "dashboard_username": "admin",
+          "env_vars": []
+        },
+        "schema": {
+          "dashboard_username": "match(^[A-Za-z0-9_.@-]{1,64}$)",
+          "dashboard_password": "password?",
+          "api_server_key": "password?",
+          "webhook_secret": "password?",
+          "public_url": "url?",
+          "minimax_api_key": "password?",
+          "openrouter_api_key": "password?",
+          "github_token": "password?",
+          "env_vars": [
+            {
+              "key": "match(^[A-Z][A-Z0-9_]*$)",
+              "value": "str"
+            }
+          ]
+        }
+      },
+      "source_build_supported": true,
+      "images": {
+        "amd64": {
+          "reference": "ghcr.io/woowtech/woow-ha-hermes-amd64:0.1.6",
+          "index_digest": "sha256:5071be6b86a5cccd42090ece55877dc4c3e98c40183d6cf13df4f55335194de5",
+          "digest": "sha256:c49fc76aa016042c3c5cb95b07f133392f8572fb5316f198ccb6fe8c25f9e94b",
+          "source_revision": "29112bef099274229cadff79cdff7bf7b99c4b77"
+        }
+      },
+      "delivery": "published-image",
+      "validation": "manifest+architecture-images+configured-CI",
+      "publisher_run_id": "37410231817",
+      "channel": "stable"
+    }
+  }
+}
