@@ -43,6 +43,7 @@ jobs:
         working-directory: hermes
         run: |
           python3 test/test-config-contract.py
+          python3 test/test-exec-boundary.py
           node test/test-ingress-shim.mjs
           node test/test-ingress-shim-ws.mjs
           node test/test-ingress-shim-route.mjs
