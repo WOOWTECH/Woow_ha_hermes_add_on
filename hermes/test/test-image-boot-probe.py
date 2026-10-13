@@ -2,6 +2,8 @@
 from pathlib import Path
 import ast
 import importlib.util
+import contextlib
+import io
 import json
 import os
 from types import SimpleNamespace
@@ -37,6 +39,26 @@ class BootGate(unittest.TestCase):
         for bad in ({}, {'path': ''}, {'path': '/usr/bin'}, {'path': '/opt/hermes/bin::/bin'}, {'path': 'relative:/opt/hermes/bin'}):
             with patch.object(smoke, 'docker', return_value=SimpleNamespace(stdout=json.dumps(bad).encode())):
                 with self.assertRaises((ValueError, KeyError)): smoke.main_context('same-candidate-container')
+
+    def test_context_diagnostics_only_print_boolean_schema(self):
+        spec = importlib.util.spec_from_file_location('image_smoke', Path(__file__).with_name('test-exec-boundary-image.py'))
+        smoke = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(smoke)
+        value = {name + '_' + check: False for name in ('s6-setuidgid', 'with-contenv')
+                 for check in ('exists', 'executable', 'safe_file')}
+        value.update(pid1_s6=False, tokens_cleaned=True, path='/synthetic-private-path')
+        output = io.StringIO()
+        with patch.object(smoke, 'docker', return_value=SimpleNamespace(stdout=json.dumps(value).encode())), contextlib.redirect_stdout(output):
+            smoke.context_metadata('fixture')
+        receipt = json.loads(output.getvalue().removeprefix('CONTEXT_CHECKS '))
+        self.assertNotIn('path', receipt)
+        self.assertTrue(all(type(v) is bool for v in receipt.values()))
+        self.assertNotIn('/synthetic-private-path', output.getvalue())
+        for bad in (dict(value, unexpected='synthetic'), dict(value, pid1_s6='synthetic')):
+            output = io.StringIO()
+            with patch.object(smoke, 'docker', return_value=SimpleNamespace(stdout=json.dumps(bad).encode())), contextlib.redirect_stdout(output):
+                with self.assertRaises(ValueError): smoke.context_metadata('fixture')
+            self.assertEqual(output.getvalue(), '')
 
     def test_empty_secret_rejected(self):
         with tempfile.TemporaryDirectory() as d:

@@ -17,11 +17,41 @@ import uuid
 
 PYTHON = "/opt/hermes/.venv/bin/python"
 TOKENS = ("SUPERVISOR_TOKEN", "HASSIO_TOKEN")
+PHASE = 'initial'
+
+
+def phase(name):
+    global PHASE
+    PHASE = name
+    print('PHASE ' + name, flush=True)
+
+
+def context_metadata(container):
+    code = '''import os,json,pathlib
+p=pathlib.Path
+out={'path':os.environ.get('PATH','')}
+for name in ('s6-setuidgid','with-contenv'):
+ f=p('/command')/name
+ out[name+'_exists']=f.exists()
+ out[name+'_executable']=os.access(f,os.X_OK)
+ out[name+'_safe_file']=f.is_file() and (not f.is_symlink() or str(f.resolve()).startswith(('/package/','/run/s6/')))
+out['pid1_s6']=b's6-svscan' in p('/proc/1/cmdline').read_bytes()
+out['tokens_cleaned']=all(not (p('/run/s6/container_environment')/k).exists() for k in ('SUPERVISOR_TOKEN','HASSIO_TOKEN'))
+print(json.dumps(out))'''
+    value = json.loads(docker('exec', container, PYTHON, '-c', code).stdout)
+    keys = {name + '_' + check for name in ('s6-setuidgid', 'with-contenv')
+            for check in ('exists', 'executable', 'safe_file')}
+    keys.update(('pid1_s6', 'tokens_cleaned'))
+    if set(value) != keys | {'path'} or not isinstance(value['path'], str) or not all(type(value[k]) is bool for k in keys):
+        raise ValueError('invalid context metadata')
+    print('CONTEXT_CHECKS ' + json.dumps({k:value[k] for k in sorted(keys)}), flush=True)
+    return value
 
 
 def docker(*args, check=True, timeout=90):
     result = subprocess.run(["docker", *args], capture_output=True, timeout=timeout)
     if check and result.returncode:
+        print('DOCKER_EXIT ' + str(result.returncode), flush=True)
         raise RuntimeError("docker operation failed (output withheld)")
     return result
 
@@ -85,10 +115,13 @@ raise SystemExit(42)
         env = [item for key in TOKENS for item in ("-e", key + "=synthetic-ci-only")]
         try:
             # Normal entrypoint, bootstrap, and real long-running s6 services.
+            phase('normal-create')
             docker("create", "--name", names[0], "--network", "none", *env,
                    "--mount", f"type=bind,src={options},dst=/data/options.json,readonly",
                    image)
+            phase('normal-start')
             docker("start", names[0])
+            phase('normal-boot')
             boot_check = pathlib.Path(__file__).with_name('image_boot_probe.py').read_text()
             deadline = time.monotonic() + 240
             while True:
@@ -111,24 +144,32 @@ raise SystemExit(42)
                 time.sleep(5)
             # Recheck after a stability window, not just one lucky process sample.
             time.sleep(10)
+            phase('normal-stability')
             docker("exec", names[0], PYTHON, "-c", boot_check)
             print("PASS normal bootstrap, s6 worker identities, UID10000, token absence, gateway JSON health")
 
             # Real wrappers and s6 binaries; no external-command doubles.
+            phase('fixture-start')
             docker("run", "-d", "--name", names[1], "--network", "none", *env,
                    "-e", "BOUNDARY_KEEP=synthetic-preserved",
                    "--mount", f"type=bind,src={probe},dst=/opt/hermes/.venv/bin/hermes,readonly",
                    "--mount", f"type=bind,src={probe},dst=/boundary-probe,readonly",
                    "--entrypoint", "/bin/sleep", image, "600")
+            phase('fixture-context')
+            context_metadata(names[1])
             # Verify installed shim is the patched source, not a bypassing link.
+            phase('installed-shim')
             docker("exec", names[1], PYTHON, "-c", '''from pathlib import Path as P
 assert P('/opt/hermes/bin/hermes').read_bytes() == P('/opt/hermes/docker/hermes-exec-shim.sh').read_bytes()
 assert b'unset SUPERVISOR_TOKEN HASSIO_TOKEN' in P('/opt/hermes/bin/hermes').read_bytes()
 ''')
+            phase('main-context')
             path = main_context(names[1])
+            phase('seed-envdir')
             docker("exec", names[1], PYTHON, "-c", seed_environment(path))
             cases = exec_cases(path)
             for case, (flags, wrapper, uid, args) in enumerate(cases, 1):
+                phase('exec-case-' + str(case))
                 result = docker("exec", *flags, names[1], wrapper, *args,
                                 uid, "", "two words", "$(not-a-command)", check=False)
                 if result.returncode != 42:
@@ -147,5 +188,5 @@ if __name__ == "__main__":
             raise RuntimeError("usage: test-exec-boundary-image.py IMAGE")
         main(sys.argv[1])
     except Exception:
-        print("FAIL exec-boundary image smoke (details intentionally withheld)", file=sys.stderr)
+        print("FAIL exec-boundary image smoke phase=" + PHASE + " (details intentionally withheld)", file=sys.stderr)
         sys.exit(1)
