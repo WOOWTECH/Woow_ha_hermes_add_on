@@ -11,14 +11,17 @@ on:
       - main
     paths:
       - hermes/config.yaml
+  pull_request:
+    paths:
+      - 'hermes/**'
+      - '.github/workflows/publish-hermes-addon-images.yml'
   workflow_dispatch:
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 concurrency:
-  group: publish-hermes
+  group: publish-hermes-${{ github.event_name == 'pull_request' && github.event.pull_request.number || 'release' }}
   cancel-in-progress: false
 
 jobs:
@@ -50,8 +53,40 @@ jobs:
           node test/test-ingress-cookies.mjs
           timeout 120 python3 test/test-ws-relay.py
 
+  candidate:
+    name: Candidate image smoke (no publish)
+    if: github.event_name == 'pull_request'
+    needs: test
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Free disk space
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: ./hermes
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: ha-hermes-candidate:smoke
+          build-args: |
+            BUILD_ARCH=amd64
+            BUILD_VERSION=candidate
+      - name: Check real image exec boundary and normal s6 boot
+        run: python3 hermes/test/test-exec-boundary-image.py ha-hermes-candidate:smoke
+      - name: Check approval gate
+        run: docker run --rm --network none -v "${PWD}/hermes/test:/t:ro" --entrypoint /opt/hermes/.venv/bin/python ha-hermes-candidate:smoke /t/test-approval-gate.py
+
   publish:
     name: Publish amd64 image
+    permissions:
+      contents: write
+      packages: write
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-24.04
     steps:
@@ -118,6 +153,12 @@ jobs:
         run: |
           docker run --rm -v "${PWD}/hermes/test:/t:ro" --entrypoint /opt/hermes/.venv/bin/python \
             "ghcr.io/woowtech/woow-ha-hermes-amd64:${VERSION}" /t/test-approval-gate.py
+
+      - name: Check real image exec boundary and normal s6 boot
+        if: steps.released.outputs.done != 'true'
+        env:
+          VERSION: ${{ steps.addon.outputs.version }}
+        run: python3 hermes/test/test-exec-boundary-image.py "ghcr.io/woowtech/woow-ha-hermes-amd64:${VERSION}"
 
       # Home Assistant pulls without credentials. A new GHCR package can start
       # out private; releasing then would publish a version nobody can install.
