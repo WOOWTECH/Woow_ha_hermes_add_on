@@ -35,13 +35,14 @@ for name in ('s6-setuidgid','with-contenv'):
  out[name+'_exists']=f.exists()
  out[name+'_executable']=os.access(f,os.X_OK)
  out[name+'_safe_file']=f.is_file() and (not f.is_symlink() or str(f.resolve()).startswith(('/package/','/run/s6/')))
+out['with_contenv_clears_env']=b'emptyenv' in p('/command/with-contenv').read_bytes()
 out['pid1_s6']=b's6-svscan' in p('/proc/1/cmdline').read_bytes()
 out['tokens_cleaned']=all(not (p('/run/s6/container_environment')/k).exists() for k in ('SUPERVISOR_TOKEN','HASSIO_TOKEN'))
 print(json.dumps(out))'''
     value = json.loads(docker('exec', container, PYTHON, '-c', code).stdout)
     keys = {name + '_' + check for name in ('s6-setuidgid', 'with-contenv')
             for check in ('exists', 'executable', 'safe_file')}
-    keys.update(('pid1_s6', 'tokens_cleaned'))
+    keys.update(('pid1_s6', 'tokens_cleaned', 'with_contenv_clears_env'))
     if set(value) != keys | {'path'} or not isinstance(value['path'], str) or not all(type(value[k]) is bool for k in keys):
         raise ValueError('invalid context metadata')
     print('CONTEXT_CHECKS ' + json.dumps({k:value[k] for k in sorted(keys)}), flush=True)
@@ -88,6 +89,9 @@ def seed_environment(path):
 p=P('/run/s6/container_environment'); p.mkdir(parents=True, exist_ok=True)
 for key in ('SUPERVISOR_TOKEN','HASSIO_TOKEN'): (p/key).write_text('synthetic-rehydrated')
 (p/'BOUNDARY_KEEP').write_text('synthetic-preserved')
+# Real with-contenv clears inherited variables, including the reentry marker.
+# Normal s6 boot supplies this value; the sleep-only fixture must seed it too.
+(p/'HERMES_HOME').write_text('/opt/data')
 (p/'PATH').write_text(''' + repr(path) + ''')
 '''
 
@@ -187,6 +191,8 @@ if __name__ == "__main__":
         if len(sys.argv) != 2:
             raise RuntimeError("usage: test-exec-boundary-image.py IMAGE")
         main(sys.argv[1])
-    except Exception:
+    except Exception as error:
+        if isinstance(error, subprocess.TimeoutExpired):
+            print('CHECK_TIMEOUT phase=' + PHASE, file=sys.stderr)
         print("FAIL exec-boundary image smoke phase=" + PHASE + " (details intentionally withheld)", file=sys.stderr)
         sys.exit(1)

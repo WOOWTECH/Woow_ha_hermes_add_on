@@ -160,6 +160,34 @@ class ShellBoundary(unittest.TestCase):
                                             names + ["agent-probe" if executable else "hermes"], main=True)
                         self.assertEqual(events[-1]["env"]["HOME"], str(self.data))
 
+    def test_image_seed_with_environment_clearing_reentry(self):
+        # Exercise the image runner's actual seed callsite against a helper ABI
+        # that clears inherited variables (including the wrapper-ready marker).
+        spec = importlib.util.spec_from_file_location('image_smoke', ADDON / 'test/test-exec-boundary-image.py')
+        smoke = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(smoke)
+        envdir = self.root / 'container_environment'
+        seed = smoke.seed_environment(f'{self.bin}:/usr/bin:/bin')
+        exec(seed.replace("'/run/s6/container_environment'", repr(str(envdir))), {})
+        for key, value in {
+            'EVENTS': str(self.root / 'events.jsonl'), 'TEST_UID': '0',
+            'TEST_DATA': str(self.data), 'TEST_EXIT': '42',
+            'OPENAI_API_KEY': 'provider-sentinel',
+            'CUSTOM_SETTING': 'keep spaces; $literal',
+        }.items():
+            (envdir / key).write_text(value)
+        helper = self.bin / 'with-contenv'
+        helper.write_text(f'#!{sys.executable}\n' +
+                          'import os, sys\nfrom pathlib import Path\n' +
+                          f'env = {{p.name: p.read_text() for p in Path({str(envdir)!r}).iterdir()}}\n' +
+                          'os.environ.clear()\nos.environ.update(env)\n' +
+                          'os.execvp(sys.argv[1], sys.argv[1:])\n')
+        args = ('agent-probe', '', 'two words', '*;$HOME')
+        result, events = self.run_shell('main-wrapper.sh', args=args, reenter=True, code=42)
+        self.assert_handoff(result, events, args[1:], ['s6-setuidgid', 'agent-probe'], code=42, main=True)
+        self.assertEqual(events[-1]['env']['BOUNDARY_KEEP'], 'synthetic-preserved')
+        self.assertEqual(events[-1]['env']['HERMES_HOME'], '/opt/data')
+
     def test_main_reentry_guard(self):
         result, events = self.run_shell("main-wrapper.sh", reenter=True, ready=True)
         self.assert_handoff(result, events, (), ["s6-setuidgid", "hermes"], main=True)

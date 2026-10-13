@@ -46,7 +46,8 @@ class BootGate(unittest.TestCase):
         spec.loader.exec_module(smoke)
         value = {name + '_' + check: False for name in ('s6-setuidgid', 'with-contenv')
                  for check in ('exists', 'executable', 'safe_file')}
-        value.update(pid1_s6=False, tokens_cleaned=True, path='/synthetic-private-path')
+        value.update(pid1_s6=False, tokens_cleaned=True, with_contenv_clears_env=True,
+                     path='/synthetic-private-path')
         output = io.StringIO()
         with patch.object(smoke, 'docker', return_value=SimpleNamespace(stdout=json.dumps(value).encode())), contextlib.redirect_stdout(output):
             smoke.context_metadata('fixture')
