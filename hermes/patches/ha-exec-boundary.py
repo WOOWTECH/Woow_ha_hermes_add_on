@@ -2,11 +2,13 @@
 """Keep HA bootstrap tokens out of inherited Hermes exec boundaries.
 
 Pinned installed sources: test/fixtures/exec-boundary/PROVENANCE.md.
-Validate BOTH files before writing either. Exact source hashes and unique anchors
+Validate all sources and the optional installed shim before writing any file.
+Exact source hashes and unique anchors
 fail closed on drift; reapplication accepts only the complete expected patch.
 """
 import argparse
 import hashlib
+import stat
 from pathlib import Path
 
 CLEAR = "# woow: HA bootstrap tokens must not cross an agent exec boundary\nunset SUPERVISOR_TOKEN HASSIO_TOKEN\n"
@@ -54,11 +56,17 @@ def check_source(name, source):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", type=Path, default=Path("/opt/hermes/docker"))
+    parser.add_argument("--installed-shim", type=Path,
+                        help="Also patch the independent /opt/hermes/bin/hermes copy")
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args()
     pending = {}
-    for name in SPECS:
-        path = args.directory / name
+    targets = [(args.directory / name, name) for name in SPECS]
+    if args.installed_shim is not None:
+        targets.append((args.installed_shim, "hermes-exec-shim.sh"))
+    for path, name in targets:
+        if not stat.S_ISREG(path.lstat().st_mode):
+            raise ValueError(f"{path.name}: expected regular file, not symlink")
         source = path.read_bytes().decode("utf-8")
         if args.check:
             check_source(name, source)

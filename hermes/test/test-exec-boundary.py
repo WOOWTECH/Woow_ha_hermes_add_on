@@ -160,6 +160,34 @@ class ShellBoundary(unittest.TestCase):
                                             names + ["agent-probe" if executable else "hermes"], main=True)
                         self.assertEqual(events[-1]["env"]["HOME"], str(self.data))
 
+    def test_image_seed_with_environment_clearing_reentry(self):
+        # Exercise the image runner's actual seed callsite against a helper ABI
+        # that clears inherited variables (including the wrapper-ready marker).
+        spec = importlib.util.spec_from_file_location('image_smoke', ADDON / 'test/test-exec-boundary-image.py')
+        smoke = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(smoke)
+        envdir = self.root / 'container_environment'
+        seed = smoke.seed_environment(f'{self.bin}:/usr/bin:/bin')
+        exec(seed.replace("'/run/s6/container_environment'", repr(str(envdir))), {})
+        for key, value in {
+            'EVENTS': str(self.root / 'events.jsonl'), 'TEST_UID': '0',
+            'TEST_DATA': str(self.data), 'TEST_EXIT': '42',
+            'OPENAI_API_KEY': 'provider-sentinel',
+            'CUSTOM_SETTING': 'keep spaces; $literal',
+        }.items():
+            (envdir / key).write_text(value)
+        helper = self.bin / 'with-contenv'
+        helper.write_text(f'#!{sys.executable}\n' +
+                          'import os, sys\nfrom pathlib import Path\n' +
+                          f'env = {{p.name: p.read_text() for p in Path({str(envdir)!r}).iterdir()}}\n' +
+                          'os.environ.clear()\nos.environ.update(env)\n' +
+                          'os.execvp(sys.argv[1], sys.argv[1:])\n')
+        args = ('agent-probe', '', 'two words', '*;$HOME')
+        result, events = self.run_shell('main-wrapper.sh', args=args, reenter=True, code=42)
+        self.assert_handoff(result, events, args[1:], ['s6-setuidgid', 'agent-probe'], code=42, main=True)
+        self.assertEqual(events[-1]['env']['BOUNDARY_KEEP'], 'synthetic-preserved')
+        self.assertEqual(events[-1]['env']['HERMES_HOME'], '/opt/data')
+
     def test_main_reentry_guard(self):
         result, events = self.run_shell("main-wrapper.sh", reenter=True, ready=True)
         self.assert_handoff(result, events, (), ["s6-setuidgid", "hermes"], main=True)
@@ -215,6 +243,55 @@ class PatchContract(unittest.TestCase):
             for args in ([], [], ["--check"]):
                 subprocess.run(cmd + args, check=True, capture_output=True)
                 self.assertEqual(second.stat().st_mode & 0o777, 0o755)
+
+    def test_installed_copy_preflight_and_modes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "hermes-exec-shim.sh"
+            wrapper = root / "main-wrapper.sh"
+            installed = root / "installed-hermes"
+            for name in HASHES:
+                shutil.copy2(FIXTURES / name, root / name)
+            shutil.copy2(source, installed)
+            installed.chmod(0o751)
+            before = installed.stat()
+            cmd = [sys.executable, str(ADDON / "patches/ha-exec-boundary.py"),
+                   "--directory", directory, "--installed-shim", str(installed)]
+            original = installed.read_bytes()
+            # Last-target drift must not partly patch either preceding source.
+            installed.write_bytes(original + b"# drift\n")
+            saved = {p: p.read_bytes() for p in (source, wrapper, installed)}
+            self.assertNotEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
+            self.assertEqual({p: p.read_bytes() for p in saved}, saved)
+            installed.unlink()
+            installed.symlink_to(source)
+            self.assertNotEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
+            self.assertEqual(source.read_bytes(), original)
+            installed.unlink()
+            installed.write_bytes(original)
+            installed.chmod(0o751)
+            before = installed.stat()
+            # Already-patched source with the as-yet-unpatched installed copy.
+            subprocess.run(cmd[:-2], check=True, capture_output=True)
+            subprocess.run(cmd, check=True, capture_output=True)
+            patched = installed.read_bytes()
+            self.assertEqual(patched, source.read_bytes())
+            for args in ([], ["--check"]):
+                subprocess.run(cmd + args, check=True, capture_output=True)
+                after = installed.stat()
+                self.assertEqual((after.st_ino, after.st_mode, after.st_uid, after.st_gid),
+                                 (before.st_ino, before.st_mode, before.st_uid, before.st_gid))
+                self.assertEqual(installed.read_bytes(), patched)
+            # Original source + original copy in one pass, and source symlinks fail.
+            for name in HASHES:
+                (root / name).write_bytes((FIXTURES / name).read_bytes())
+            installed.write_bytes(original)
+            subprocess.run(cmd, check=True, capture_output=True)
+            self.assertEqual(installed.read_bytes(), patched)
+            source.unlink()
+            source.symlink_to(installed)
+            self.assertNotEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
+            self.assertEqual(installed.read_bytes(), patched)
 
     def test_build_and_bootstrap_contract(self):
         dockerfile = (ADDON / "Dockerfile").read_text()
