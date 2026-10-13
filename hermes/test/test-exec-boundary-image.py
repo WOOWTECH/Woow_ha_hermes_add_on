@@ -53,37 +53,7 @@ raise SystemExit(42)
                    "--mount", f"type=bind,src={options},dst=/data/options.json,readonly",
                    image)
             docker("start", names[0])
-            boot_check = '''import os, pathlib, socket, subprocess, json
-p = pathlib.Path
-checks = {"pid1_s6": b"s6-svscan" in p("/proc/1/cmdline").read_bytes(),
-          "tokens_removed_from_envdir": all(not (p("/run/s6/container_environment") / k).exists() for k in ("SUPERVISOR_TOKEN", "HASSIO_TOKEN")),
-          "bootstrap_secret_written": p("/data/secrets/api_server_key").is_file(),
-          "gateway_seen": False, "dashboard_seen": False,
-          "service_uids_correct": True, "service_tokens_absent": True,
-          "dashboard_listening": False, "relay_listening": False}
-for d in p("/proc").iterdir():
-    if not d.name.isdigit(): continue
-    try:
-        cmd = (d / "cmdline").read_bytes()
-        status = (d / "status").read_text()
-        if b"python" not in cmd or d.name == str(os.getpid()): continue
-        role = "gateway" if any(x in cmd.replace(bytes([0]), b" ") for x in (b"gateway run", b"gateway.run", b"/gateway/run.py")) else ("dashboard" if b"hermes dashboard" in cmd.replace(bytes([0]), b" ") else None)
-        if role is None: continue
-        uid = next(x for x in status.splitlines() if x.startswith("Uid:")).split()[1:]
-        checks["service_uids_correct"] &= uid == ["10000"] * 4
-        # Read same-UID process environment without granting SYS_PTRACE.
-        scan = "import pathlib,sys; e=pathlib.Path(sys.argv[1]).read_bytes().split(bytes([0])); assert not any(x.startswith((b'SUPERVISOR_TOKEN=',b'HASSIO_TOKEN=')) for x in e)"
-        result = subprocess.run(['/command/s6-setuidgid', 'hermes', '/opt/hermes/.venv/bin/python', '-c', scan, str(d/'environ')], capture_output=True)
-        checks["service_tokens_absent"] &= result.returncode == 0
-        checks[role + "_seen"] = True
-    except (FileNotFoundError, ProcessLookupError): pass
-for port, key in ((9119, "dashboard_listening"), (9121, "relay_listening")):
-    try:
-        with socket.create_connection(("127.0.0.1", port), timeout=2): checks[key] = True
-    except OSError: pass
-print(json.dumps(checks))
-raise SystemExit(0 if all(checks.values()) else 1)
-'''
+            boot_check = pathlib.Path(__file__).with_name('image_boot_probe.py').read_text()
             deadline = time.monotonic() + 240
             while True:
                 result = docker("exec", names[0], PYTHON, "-c", boot_check, check=False, timeout=15)
@@ -91,9 +61,10 @@ raise SystemExit(0 if all(checks.values()) else 1)
                     break
                 if time.monotonic() >= deadline:
                     # Our own finite boolean schema, never raw Docker or app output.
-                    keys = {"pid1_s6", "tokens_removed_from_envdir", "bootstrap_secret_written",
-                            "gateway_seen", "dashboard_seen", "service_uids_correct",
-                            "service_tokens_absent", "dashboard_listening", "relay_listening"}
+                    keys = {"pid1_s6", "tokens_removed_from_envdir", "bootstrap_secret_nonempty",
+                            "gateway_json_health", "dashboard_listening", "relay_listening"}
+                    keys.update(role + '_' + check for role in ('gateway-default', 'dashboard')
+                                for check in ('identity', 'uid10000', 'tokens_absent'))
                     try:
                         checks = json.loads(result.stdout)
                         if set(checks) == keys and all(type(v) is bool for v in checks.values()):
@@ -105,7 +76,7 @@ raise SystemExit(0 if all(checks.values()) else 1)
             # Recheck after a stability window, not just one lucky process sample.
             time.sleep(10)
             docker("exec", names[0], PYTHON, "-c", boot_check)
-            print("PASS normal bootstrap, s6 PID1, gateway/dashboard UID10000, token absence, listeners")
+            print("PASS normal bootstrap, s6 worker identities, UID10000, token absence, gateway JSON health")
 
             # Real wrappers and s6 binaries; no external-command doubles.
             docker("run", "-d", "--name", names[1], "--network", "none", *env,
@@ -132,10 +103,11 @@ for key in ('SUPERVISOR_TOKEN','HASSIO_TOKEN'): (p/key).write_text('synthetic-re
                 (["-e", "HERMES_HOME="], "/opt/hermes/docker/main-wrapper.sh", "10000", ["/boundary-probe"]),
                 (["--user", "10000:10000", "-e", "HERMES_HOME=/opt/data"], "/opt/hermes/docker/main-wrapper.sh", "10000", ["/boundary-probe"]),
             ]
-            for flags, wrapper, uid, args in cases:
+            for case, (flags, wrapper, uid, args) in enumerate(cases, 1):
                 result = docker("exec", *flags, names[1], wrapper, *args,
                                 uid, "", "two words", "$(not-a-command)", check=False)
                 if result.returncode != 42:
+                    print("EXEC_CHECK_FAILED case=" + str(case))
                     raise RuntimeError("exec UID/token/argv/exit check failed (output withheld)")
             print("PASS 6 real shim/main/s6 UID cases including root opt-out and with-contenv reentry")
         finally:

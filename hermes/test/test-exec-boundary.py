@@ -216,6 +216,55 @@ class PatchContract(unittest.TestCase):
                 subprocess.run(cmd + args, check=True, capture_output=True)
                 self.assertEqual(second.stat().st_mode & 0o777, 0o755)
 
+    def test_installed_copy_preflight_and_modes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "hermes-exec-shim.sh"
+            wrapper = root / "main-wrapper.sh"
+            installed = root / "installed-hermes"
+            for name in HASHES:
+                shutil.copy2(FIXTURES / name, root / name)
+            shutil.copy2(source, installed)
+            installed.chmod(0o751)
+            before = installed.stat()
+            cmd = [sys.executable, str(ADDON / "patches/ha-exec-boundary.py"),
+                   "--directory", directory, "--installed-shim", str(installed)]
+            original = installed.read_bytes()
+            # Last-target drift must not partly patch either preceding source.
+            installed.write_bytes(original + b"# drift\n")
+            saved = {p: p.read_bytes() for p in (source, wrapper, installed)}
+            self.assertNotEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
+            self.assertEqual({p: p.read_bytes() for p in saved}, saved)
+            installed.unlink()
+            installed.symlink_to(source)
+            self.assertNotEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
+            self.assertEqual(source.read_bytes(), original)
+            installed.unlink()
+            installed.write_bytes(original)
+            installed.chmod(0o751)
+            before = installed.stat()
+            # Already-patched source with the as-yet-unpatched installed copy.
+            subprocess.run(cmd[:-2], check=True, capture_output=True)
+            subprocess.run(cmd, check=True, capture_output=True)
+            patched = installed.read_bytes()
+            self.assertEqual(patched, source.read_bytes())
+            for args in ([], ["--check"]):
+                subprocess.run(cmd + args, check=True, capture_output=True)
+                after = installed.stat()
+                self.assertEqual((after.st_ino, after.st_mode, after.st_uid, after.st_gid),
+                                 (before.st_ino, before.st_mode, before.st_uid, before.st_gid))
+                self.assertEqual(installed.read_bytes(), patched)
+            # Original source + original copy in one pass, and source symlinks fail.
+            for name in HASHES:
+                (root / name).write_bytes((FIXTURES / name).read_bytes())
+            installed.write_bytes(original)
+            subprocess.run(cmd, check=True, capture_output=True)
+            self.assertEqual(installed.read_bytes(), patched)
+            source.unlink()
+            source.symlink_to(installed)
+            self.assertNotEqual(subprocess.run(cmd, capture_output=True).returncode, 0)
+            self.assertEqual(installed.read_bytes(), patched)
+
     def test_build_and_bootstrap_contract(self):
         dockerfile = (ADDON / "Dockerfile").read_text()
         self.assertIn("python3 /tmp/woow-own-patches/ha-exec-boundary.py", dockerfile)
