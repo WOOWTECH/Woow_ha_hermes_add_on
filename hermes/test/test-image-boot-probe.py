@@ -1,5 +1,10 @@
 """Negative controls for the image gate; no Docker or real secrets needed."""
 from pathlib import Path
+import ast
+import importlib.util
+import json
+import os
+from types import SimpleNamespace
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -7,6 +12,32 @@ import image_boot_probe as probe
 
 
 class BootGate(unittest.TestCase):
+    def test_main_path_comes_only_from_candidate(self):
+        spec = importlib.util.spec_from_file_location('image_smoke', Path(__file__).with_name('test-exec-boundary-image.py'))
+        smoke = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(smoke)
+        original = '/opt/hermes/bin:/opt/hermes/.venv/bin:/usr/bin:/bin'
+        with patch.dict(os.environ, {'PATH': '/not-the-candidate'}), \
+             patch.object(smoke, 'docker', return_value=SimpleNamespace(stdout=json.dumps({'path': original}).encode())) as docker:
+            path = smoke.main_context('same-candidate-container')
+            self.assertEqual(path, '/command:' + original)
+            args = docker.call_args.args
+            self.assertEqual(args[:3], ('exec', 'same-candidate-container', smoke.PYTHON))
+            self.assertIn("os.environ['PATH']", args[-1])
+            self.assertIn("os.access('/command/s6-setuidgid', os.X_OK)", args[-1])
+            self.assertIn("os.access('/command/with-contenv', os.X_OK)", args[-1])
+        cases = smoke.exec_cases(path)
+        self.assertEqual(len(cases), 6)
+        for flags, *_ in cases[:3]:
+            self.assertFalse(any(x.startswith('PATH=') for x in flags))
+        for flags, *_ in cases[3:]:
+            self.assertEqual([x for x in flags if x.startswith('PATH=')], ['PATH=' + path])
+        seed = ast.parse(smoke.seed_environment(path))
+        self.assertEqual(ast.literal_eval(seed.body[-1].value.args[0]), path)
+        for bad in ({}, {'path': ''}, {'path': '/usr/bin'}, {'path': '/opt/hermes/bin::/bin'}, {'path': 'relative:/opt/hermes/bin'}):
+            with patch.object(smoke, 'docker', return_value=SimpleNamespace(stdout=json.dumps(bad).encode())):
+                with self.assertRaises((ValueError, KeyError)): smoke.main_context('same-candidate-container')
+
     def test_empty_secret_rejected(self):
         with tempfile.TemporaryDirectory() as d:
             p = Path(d) / 'secret'

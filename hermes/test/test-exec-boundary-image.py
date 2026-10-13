@@ -26,6 +26,42 @@ def docker(*args, check=True, timeout=90):
     return result
 
 
+def main_context(container):
+    # Query only PATH from this same image/container, never the runner's env.
+    code = '''import os,json
+assert os.access('/command/s6-setuidgid', os.X_OK)
+assert os.access('/command/with-contenv', os.X_OK)
+print(json.dumps({'path':os.environ['PATH']}))'''
+    value = json.loads(docker('exec', container, PYTHON, '-c', code).stdout)
+    if set(value) != {'path'} or not isinstance(value['path'], str):
+        raise ValueError('invalid image PATH receipt')
+    entries = value['path'].split(':')
+    if not all(p.startswith('/') for p in entries) or '/opt/hermes/bin' not in entries:
+        raise ValueError('unexpected image PATH')
+    return '/command:' + value['path']
+
+
+def exec_cases(path):
+    main_env = ['-e', 'PATH=' + path]
+    return [
+        ([], '/opt/hermes/bin/hermes', '10000', []),
+        (['--user', '10000:10000'], '/opt/hermes/bin/hermes', '10000', []),
+        (['-e', 'HERMES_DOCKER_EXEC_AS_ROOT=1'], '/opt/hermes/bin/hermes', '0', []),
+        (main_env + ['-e', 'HERMES_HOME=/opt/data'], '/opt/hermes/docker/main-wrapper.sh', '10000', ['/boundary-probe']),
+        (main_env + ['-e', 'HERMES_HOME='], '/opt/hermes/docker/main-wrapper.sh', '10000', ['/boundary-probe']),
+        (main_env + ['--user', '10000:10000', '-e', 'HERMES_HOME=/opt/data'], '/opt/hermes/docker/main-wrapper.sh', '10000', ['/boundary-probe']),
+    ]
+
+
+def seed_environment(path):
+    return '''from pathlib import Path as P
+p=P('/run/s6/container_environment'); p.mkdir(parents=True, exist_ok=True)
+for key in ('SUPERVISOR_TOKEN','HASSIO_TOKEN'): (p/key).write_text('synthetic-rehydrated')
+(p/'BOUNDARY_KEEP').write_text('synthetic-preserved')
+(p/'PATH').write_text(''' + repr(path) + ''')
+'''
+
+
 def main(image):
     names = ["ha-boundary-" + uuid.uuid4().hex for _ in range(2)]
     with tempfile.TemporaryDirectory(prefix="ha-boundary-") as temp:
@@ -89,25 +125,14 @@ raise SystemExit(42)
 assert P('/opt/hermes/bin/hermes').read_bytes() == P('/opt/hermes/docker/hermes-exec-shim.sh').read_bytes()
 assert b'unset SUPERVISOR_TOKEN HASSIO_TOKEN' in P('/opt/hermes/bin/hermes').read_bytes()
 ''')
-            seed = '''from pathlib import Path as P
-p=P('/run/s6/container_environment'); p.mkdir(parents=True, exist_ok=True)
-for key in ('SUPERVISOR_TOKEN','HASSIO_TOKEN'): (p/key).write_text('synthetic-rehydrated')
-(p/'BOUNDARY_KEEP').write_text('synthetic-preserved')
-'''
-            docker("exec", names[1], PYTHON, "-c", seed)
-            cases = [
-                ([], "/opt/hermes/bin/hermes", "10000", []),
-                (["--user", "10000:10000"], "/opt/hermes/bin/hermes", "10000", []),
-                (["-e", "HERMES_DOCKER_EXEC_AS_ROOT=1"], "/opt/hermes/bin/hermes", "0", []),
-                (["-e", "HERMES_HOME=/opt/data"], "/opt/hermes/docker/main-wrapper.sh", "10000", ["/boundary-probe"]),
-                (["-e", "HERMES_HOME="], "/opt/hermes/docker/main-wrapper.sh", "10000", ["/boundary-probe"]),
-                (["--user", "10000:10000", "-e", "HERMES_HOME=/opt/data"], "/opt/hermes/docker/main-wrapper.sh", "10000", ["/boundary-probe"]),
-            ]
+            path = main_context(names[1])
+            docker("exec", names[1], PYTHON, "-c", seed_environment(path))
+            cases = exec_cases(path)
             for case, (flags, wrapper, uid, args) in enumerate(cases, 1):
                 result = docker("exec", *flags, names[1], wrapper, *args,
                                 uid, "", "two words", "$(not-a-command)", check=False)
                 if result.returncode != 42:
-                    print("EXEC_CHECK_FAILED case=" + str(case))
+                    print("EXEC_CHECK_FAILED case=" + str(case) + " exit=" + str(result.returncode))
                     raise RuntimeError("exec UID/token/argv/exit check failed (output withheld)")
             print("PASS 6 real shim/main/s6 UID cases including root opt-out and with-contenv reentry")
         finally:
