@@ -67,7 +67,7 @@ for d in p("/proc").iterdir():
         cmd = (d / "cmdline").read_bytes()
         status = (d / "status").read_text()
         if b"python" not in cmd or d.name == str(os.getpid()): continue
-        role = "gateway" if any(x in cmd.replace(bytes([0]), b" ") for x in (b"gateway run", b"gateway.run", b"/gateway/run.py")) else ("dashboard" if b"web_server" in cmd else None)
+        role = "gateway" if any(x in cmd.replace(bytes([0]), b" ") for x in (b"gateway run", b"gateway.run", b"/gateway/run.py")) else ("dashboard" if b"hermes dashboard" in cmd.replace(bytes([0]), b" ") else None)
         if role is None: continue
         uid = next(x for x in status.splitlines() if x.startswith("Uid:")).split()[1:]
         checks["service_uids_correct"] &= uid == ["10000"] * 4
