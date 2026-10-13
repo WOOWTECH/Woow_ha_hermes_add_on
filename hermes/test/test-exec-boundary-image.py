@@ -53,31 +53,36 @@ raise SystemExit(42)
                    "--mount", f"type=bind,src={options},dst=/data/options.json,readonly",
                    image)
             docker("start", names[0])
-            boot_check = '''import os, pathlib, socket, subprocess
+            boot_check = '''import os, pathlib, socket, subprocess, json
 p = pathlib.Path
-assert b"s6-svscan" in p("/proc/1/cmdline").read_bytes()
-for k in ("SUPERVISOR_TOKEN", "HASSIO_TOKEN"):
-    assert not (p("/run/s6/container_environment") / k).exists()
-assert (p("/data/secrets/api_server_key")).stat().st_size > 0
-roles = set()
+checks = {"pid1_s6": b"s6-svscan" in p("/proc/1/cmdline").read_bytes(),
+          "tokens_removed_from_envdir": all(not (p("/run/s6/container_environment") / k).exists() for k in ("SUPERVISOR_TOKEN", "HASSIO_TOKEN")),
+          "bootstrap_secret_written": p("/data/secrets/api_server_key").is_file(),
+          "gateway_seen": False, "dashboard_seen": False,
+          "service_uids_correct": True, "service_tokens_absent": True,
+          "dashboard_listening": False, "relay_listening": False}
 for d in p("/proc").iterdir():
     if not d.name.isdigit(): continue
     try:
         cmd = (d / "cmdline").read_bytes()
         status = (d / "status").read_text()
         if b"python" not in cmd or d.name == str(os.getpid()): continue
-        role = "gateway" if any(x in cmd.replace(b"\\0", b" ") for x in (b"gateway run", b"gateway.run", b"/gateway/run.py")) else ("dashboard" if b"web_server" in cmd else None)
+        role = "gateway" if any(x in cmd.replace(bytes([0]), b" ") for x in (b"gateway run", b"gateway.run", b"/gateway/run.py")) else ("dashboard" if b"web_server" in cmd else None)
         if role is None: continue
         uid = next(x for x in status.splitlines() if x.startswith("Uid:")).split()[1:]
-        assert uid == ["10000"] * 4
+        checks["service_uids_correct"] &= uid == ["10000"] * 4
         # Read same-UID process environment without granting SYS_PTRACE.
         scan = "import pathlib,sys; e=pathlib.Path(sys.argv[1]).read_bytes().split(bytes([0])); assert not any(x.startswith((b'SUPERVISOR_TOKEN=',b'HASSIO_TOKEN=')) for x in e)"
-        subprocess.run(['/command/s6-setuidgid', 'hermes', '/opt/hermes/.venv/bin/python', '-c', scan, str(d/'environ')], check=True, capture_output=True)
-        roles.add(role)
+        result = subprocess.run(['/command/s6-setuidgid', 'hermes', '/opt/hermes/.venv/bin/python', '-c', scan, str(d/'environ')], capture_output=True)
+        checks["service_tokens_absent"] &= result.returncode == 0
+        checks[role + "_seen"] = True
     except (FileNotFoundError, ProcessLookupError): pass
-assert roles == {"gateway", "dashboard"}
-for port in (9119, 9121):
-    with socket.create_connection(("127.0.0.1", port), timeout=2): pass
+for port, key in ((9119, "dashboard_listening"), (9121, "relay_listening")):
+    try:
+        with socket.create_connection(("127.0.0.1", port), timeout=2): checks[key] = True
+    except OSError: pass
+print(json.dumps(checks))
+raise SystemExit(0 if all(checks.values()) else 1)
 '''
             deadline = time.monotonic() + 240
             while True:
@@ -85,6 +90,16 @@ for port in (9119, 9121):
                 if result.returncode == 0:
                     break
                 if time.monotonic() >= deadline:
+                    # Our own finite boolean schema, never raw Docker or app output.
+                    keys = {"pid1_s6", "tokens_removed_from_envdir", "bootstrap_secret_written",
+                            "gateway_seen", "dashboard_seen", "service_uids_correct",
+                            "service_tokens_absent", "dashboard_listening", "relay_listening"}
+                    try:
+                        checks = json.loads(result.stdout)
+                        if set(checks) == keys and all(type(v) is bool for v in checks.values()):
+                            print("BOOT_CHECKS " + json.dumps(checks, sort_keys=True))
+                    except (ValueError, TypeError):
+                        print("BOOT_CHECKS unavailable")
                     raise RuntimeError("normal boot/s6 UID/token check failed (logs withheld)")
                 time.sleep(5)
             # Recheck after a stability window, not just one lucky process sample.
