@@ -92,6 +92,16 @@ jobs:
       - name: Check approval gate
         run: docker run --rm --network none -v "${PWD}/hermes/test:/t:ro" --entrypoint /opt/hermes/.venv/bin/python ha-hermes-candidate:smoke /t/test-approval-gate.py
 
+      - name: Check restored application ownership
+        run: |
+          docker run --rm --network none --read-only --user 0:0 \
+            --cap-drop ALL --cap-add CHOWN --cap-add SETUID --cap-add SETGID --cap-add DAC_OVERRIDE \
+            --security-opt no-new-privileges --memory 256m --cpus 1 --pids-limit 32 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=64m,mode=1777 \
+            -e PYTHONDONTWRITEBYTECODE=1 -v "${PWD}/hermes/test:/t:ro" \
+            --entrypoint /opt/hermes/.venv/bin/python \
+            ha-hermes-candidate:smoke /t/test-restore-ownership.py
+
   publish:
     name: Publish amd64 image
     permissions:

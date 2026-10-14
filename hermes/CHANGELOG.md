@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Repair ownership of the dedicated Home Assistant application volume after a
+  Supervisor restore, before starting Hermes. This prevents restored private
+  `platforms`, `plugins`, and `backups` directories from blocking startup.
+- Preserve ordinary file permissions and exclude symlinks and nested mounts;
+  refuse ownership changes to hardlinked files.
+
 ## 0.1.8
 
 - Fix: deleting a session or an exact batch now reclaims only prompt records
