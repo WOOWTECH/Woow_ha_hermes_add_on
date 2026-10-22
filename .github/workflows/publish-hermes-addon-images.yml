@@ -1,9 +1,14 @@
 name: Publish Hermes add-on image
 
-# A version bump in hermes/config.yaml on main builds and pushes the prebuilt
-# image Home Assistant installs, then creates the GitHub Release that
-# Woow_HA_App_Store syncs from (its mapping uses the latest Release, so the
-# store never points at a version whose image is missing).
+# A version bump in hermes/config.yaml on main builds, checks and pushes the
+# prebuilt image Home Assistant installs; the job "Release" then calls the
+# Store's shared woow-addon-release.yml, which creates the v<version> GitHub
+# Release that Woow_HA_App_Store syncs from (only after the image is public, so
+# the store never points at a version whose image is missing). A version that
+# already has a Release is not rebuilt (same-version images are immutable).
+# Every pull request runs "Unit tests" and "Candidate image smoke (no publish)",
+# the checks required before merging; they have no path filter, so a required
+# check is never left waiting.
 
 on:
   push:
@@ -12,9 +17,6 @@ on:
     paths:
       - hermes/config.yaml
   pull_request:
-    paths:
-      - 'hermes/**'
-      - '.github/workflows/publish-hermes-addon-images.yml'
   workflow_dispatch:
 
 permissions:
@@ -194,11 +196,10 @@ jobs:
             exit 1
           fi
 
-      - name: Create the GitHub Release
-        if: steps.released.outputs.done != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.addon.outputs.version }}
-        run: |
-          awk -v v="## ${VERSION}" '$0 == v { on = 1; next } /^## / && on { exit } on' hermes/CHANGELOG.md > notes.md
-          gh release create "v${VERSION}" --target "${GITHUB_SHA}" --title "${VERSION}" --notes-file notes.md
+  release:
+    name: Release
+    needs: publish
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    uses: WOOWTECH/Woow_HA_App_Store/.github/workflows/woow-addon-release.yml@main
