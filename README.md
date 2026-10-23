@@ -17,7 +17,7 @@
   <a href="https://github.com/WOOWTECH/Woow_ha_hermes_add_on/actions/workflows/publish-hermes-addon-images.yml"><img src="https://img.shields.io/github/actions/workflow/status/WOOWTECH/Woow_ha_hermes_add_on/publish-hermes-addon-images.yml?label=build" alt="Build"/></a>
   <img src="https://img.shields.io/badge/HA%20add--on-Supervisor-41BDF5?logo=home-assistant&logoColor=white" alt="Home Assistant Add-on"/>
   <img src="https://img.shields.io/badge/arch-amd64-lightgrey" alt="amd64"/>
-  <img src="https://img.shields.io/badge/Hermes%20Agent-v2026.8.31-8A2BE2" alt="Hermes Agent v2026.8.31"/>
+  <img src="https://img.shields.io/badge/Hermes%20Agent-v0.22.5-8A2BE2" alt="Hermes Agent v0.22.5"/>
 </p>
 
 <p align="center">
@@ -122,11 +122,11 @@ Full guide: [hermes/README.md](hermes/README.md) (Traditional Chinese) and [herm
 
 ## Release flow | 發佈流程
 
-1. Bump `version` in `hermes/config.yaml` and add a `## x.y.z` section to `hermes/CHANGELOG.md`, then push to `main`.
+1. Bump `version` in `hermes/config.yaml` and add a `## x.y.z` section to `hermes/CHANGELOG.md`, then open a pull request. Merge only after the required unit and candidate-image checks pass.
 2. [`publish-hermes-addon-images.yml`](.github/workflows/publish-hermes-addon-images.yml) runs the unit tests, builds and pushes `ghcr.io/woowtech/woow-ha-hermes-amd64:<version>`, runs the approval-gate test inside that image, checks the image can be pulled anonymously, and only then creates GitHub Release `v<version>`.
 3. [Woow_HA_App_Store](https://github.com/WOOWTECH/Woow_HA_App_Store) syncs `hermes/` from the latest Release into `woow-hermes/` (nightly, or run its `sync-upstreams.yml`). A failed test means no Release, so the store never offers a broken version.
 
-版本號改在 `hermes/config.yaml` 並補 CHANGELOG，推上 `main` 後 CI 自動測試、建置、推 GHCR、建 Release；商店每晚從最新 Release 同步。測試沒過就不會建 Release，商店也不會拿到壞掉的版本。
+版本號改在 `hermes/config.yaml` 並補 CHANGELOG，經 PR 必要檢查通過並合併 `main` 後，CI 自動測試、建置、推 GHCR、建 Release；商店每晚從最新 Release 同步。測試沒過就不會建 Release，商店也不會拿到壞掉的版本。
 
 ## Related | 相關專案
 

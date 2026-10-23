@@ -1,3 +1,13 @@
+## 0.1.10
+
+- Upgrade Hermes Agent to stable **v0.22.5**, commit `bf0203a794a07aac3ff764972ab9087baa4e4f4e`, using the immutable upstream image digest `sha256:9c5561579f3ffdf333401797094ac3a743738d6c25d40f4331c7bf77b694238d`.
+- Adapt HA ingress to upstream's native prefix-aware login and OAuth flow; keep chunk loading, configuration links, isolated ingress cookies and WebSocket relay support.
+- Preserve Supervisor-token isolation across exec boundaries, restored-volume ownership repair and session-scoped prompt cleanup, including the new local conversation lineage.
+- Use upstream's unattended approval fixes and verify them against the built image. Keep application code root-owned and install the browser CLI through upstream's pinned package manager.
+- Fresh installs no longer try to enable the removed `moa` and `homeassistant` core toolsets. Configure replacement integrations through Hermes Plugins/Connectors; existing user configuration is retained.
+- Remove the legacy permissive OAuth issuer override. A server returning a different issuer must correct its OAuth metadata or callback; Hermes now keeps upstream validation. Reconnect affected integrations after correcting the server.
+- Ports, architecture, add-on options, persistent data mount and HA login credentials remain unchanged. Take a Home Assistant backup before upgrading; restoring it is the rollback path after upstream database migrations.
+
 # Changelog
 
 ## 0.1.9
