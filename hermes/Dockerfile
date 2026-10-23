@@ -28,7 +28,7 @@ RUN apt-get update \
            /opt/hermes/skills/media/youtube-content /opt/hermes/skills/smart-home/openhue
 
 RUN SITE="$(/opt/hermes/.venv/bin/python3 -c 'import site; print(site.getsitepackages()[0])')" \
- && UV="$(/opt/hermes/.venv/bin/python3 -c 'from pm import installed_package; print(installed_package("uv").binary)')" \
+ && UV="$(/opt/hermes/.venv/bin/python3 -c 'from pm import uv_launcher; print(uv_launcher("uv"))')" \
  && "$UV" pip install --python /opt/hermes/.venv/bin/python3 --target="$SITE" "ddgs==${DDGS_VERSION}" \
  && /opt/hermes/.venv/bin/python3 -c 'from ddgs import DDGS'
 
