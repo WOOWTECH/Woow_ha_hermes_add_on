@@ -41,10 +41,16 @@ RUN curl -fsSL --retry 5 -o /usr/local/bin/officecli \
 # v0.22.5 carries RFC 9207 issuer through the native dashboard OAuth flow.
 # Keep the upstream SDK issuer validation; do not reapply the old permissive override.
 
-# Use the upstream package manager's hash-checked browser CLI pin.
-RUN python3 -c 'from pm import ensure; ensure("agent-browser", explicit=True)' \
+# Use the upstream package manager's hash-checked browser CLI pin. Its sealed
+# payload installs extra tools in HERMES_HOME; keep this build-only store outside
+# /opt/data, which Home Assistant replaces with the addon_config bind mount.
+RUN export HERMES_HOME=/opt/woow/browser-home \
+ && python3 -c 'from pm import ensure; ensure("agent-browser", explicit=True)' \
  && ln -sf "$(python3 -c 'from pm import installed_package; print(installed_package("agent-browser").binary)')" /usr/local/bin/agent-browser \
- && agent-browser --version
+ && chmod 0755 /opt/woow/browser-home \
+ && chmod -R a+rX /opt/woow/browser-home/tools \
+ && /command/s6-setuidgid hermes /usr/local/bin/agent-browser --version \
+ && test "$(readlink -f /usr/local/bin/agent-browser | cut -d/ -f2-3)" = opt/woow
 
 # Own patches to upstream code. They exit 1 when an anchor is missing.
 COPY patches/ /tmp/woow-own-patches/
