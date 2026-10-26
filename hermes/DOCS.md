@@ -135,6 +135,8 @@ issuer but returns another must correct its OAuth metadata or callback, then
 be reconnected. The old permissive issuer override is not reapplied.
 
 
+<a id="paseo-remote-plugin-ha-ingress"></a>
+
 ## Paseo 插件與 Dashboard 重載（0.1.11 起）
 
 附加元件包含 Paseo 的主機介面。插件仍由使用者在 Hermes 的 **Plugins** 頁安裝及啟用，不會因升級附加元件而自動新增插件、開放工具或要求更換模型帳號。
