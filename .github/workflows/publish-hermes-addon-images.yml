@@ -48,6 +48,8 @@ jobs:
         working-directory: hermes
         run: |
           python3 test/test-config-contract.py
+          python3 test/test-paseo-origin.py
+          python3 test/test-paseo-vendor.py
           python3 test/test-exec-boundary.py
           python3 test/test-scoped-prompt-gc.py
           python3 test/test-scoped-prompt-gc-patch.py

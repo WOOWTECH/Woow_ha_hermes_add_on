@@ -41,6 +41,7 @@
 - **HA 側邊欄**：透過 HA Ingress 操作儀表板與聊天終端機，功能與區網 `http://<HA IP>:9119` 完全相同（登入、WebSocket、檔案上傳下載、Swagger、F5 停在原頁都一致）。
 - **對外入口**：OpenAI 相容 API（`8642`）與 Webhook 接收器（`8644`）開在區網 port，由同一台 HA 上的 Cloudflared add-on 建立 HTTPS 公開網址。
 - **預建映像**：從 GHCR 直接下載，不在 HA 主機上建置。
+- **Paseo 插件整合**（0.1.11 起）：支援 HA Ingress 配對與 Dashboard 內重載。在 Plugins 安裝 `WOOWTECH/hermes-paseo-plugin`，依 [Paseo 設定說明](hermes/DOCS.md#paseo-remote-plugin-ha-ingress) 設定 HA 網址及模型。
 - **安全**：排程、API、Webhook 觸發的危險指令一律拒絕；Supervisor token 不會交給 agent。
 
 ### 安裝
@@ -87,6 +88,7 @@ This add-on packages the `slim` image of [Woow_podman_hermes](https://github.com
 - **HA sidebar**: the dashboard and chat terminal through HA Ingress, working exactly like the LAN port `http://<HA IP>:9119`.
 - **Machine entrances**: the OpenAI-compatible API (`8642`) and the webhook receiver (`8644`) on LAN ports, ready for a Cloudflare Tunnel from the Cloudflared add-on on the same Home Assistant.
 - **Prebuilt image** on GHCR; nothing is built on the Home Assistant host.
+- **Paseo plugin integration** (0.1.11+): HA Ingress pairing and in-dashboard reload. Install `WOOWTECH/hermes-paseo-plugin` from Plugins and follow the [Paseo setup guide](hermes/DOCS.md#paseo-remote-plugin-ha-ingress).
 - **Safety**: dangerous commands from scheduled jobs, the API and webhooks are refused; the agent never sees the Supervisor token.
 
 ### Install
