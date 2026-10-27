@@ -87,7 +87,7 @@ jobs:
       # new version (pipeline #89, category 4): pinned Syft from the Store,
       # uploaded as artifact upgrade-comparison-sbom-woow-hermes.
       - name: SBOM for the upgrade comparison
-        uses: WOOWTECH/Woow_HA_App_Store/.github/actions/addon-sbom@main
+        uses: WOOWTECH/Woow_HA_App_Store/.github/actions/addon-sbom@feat/89-upgrade-comparison
         with:
           component: woow-hermes
           image: ha-hermes-candidate:smoke
@@ -131,8 +131,9 @@ jobs:
     permissions:
       contents: read
       actions: read
-    uses: WOOWTECH/Woow_HA_App_Store/.github/workflows/woow-addon-upgrade-check.yml@main
+    uses: WOOWTECH/Woow_HA_App_Store/.github/workflows/woow-addon-upgrade-check.yml@feat/89-upgrade-comparison
     with:
+      tooling_ref: feat/89-upgrade-comparison
       sbom_artifact: upgrade-comparison-sbom-*
 
   publish:
