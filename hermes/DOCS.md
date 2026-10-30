@@ -143,7 +143,7 @@ be reconnected. The old permissive issuer override is not reapplied.
 
 1. 更新附加元件並確認啟動正常。若從 HA 側欄使用 Paseo，在此附加元件的「設定」填入 **Paseo 的 Home Assistant 網址**（`paseo_ingress_url`），例如 `https://ha.example.com` 或 `http://homeassistant.local:8123`。這必須是瀏覽器實際開啟 HA 的來源，不含 `/lovelace`、`/api/hassio_ingress/…`、帳密、query 或 fragment。保存後重啟此附加元件一次。
 2. 保留 **儀表板公開網址**（`public_url`）供 LAN 及 MCP OAuth 使用。兩個入口不同時，不要用 HA 網址取代它。僅使用 LAN Dashboard 時可以留空 `paseo_ingress_url`。
-3. 進入 Hermes → **Plugins**，在 Git URL or owner/repo 填入 `WOOWTECH/hermes-paseo-plugin`，安裝目前公開的 `0.1.4-rc.6` 並啟用。來源為公開 GitHub，不需要 GitHub token。若 Hermes 顯示執行程序的 caution，先核對來源及權限說明，再使用原生確認選項。
+3. 進入 Hermes → **Plugins**，在 Git URL or owner/repo 填入 `WOOWTECH/hermes-paseo-plugin`，安裝目前公開的 `0.1.4-rc.9` 並啟用。來源為公開 GitHub，不需要 GitHub token。若 Hermes 顯示執行程序的 caution，先核對來源及權限說明，再使用原生確認選項。
 4. 點 **Paseo**。啟用後主機會自動啟動 Paseo，首次需下載 runtime，通常約一分鐘，網路慢時更久；請等頁面顯示已啟動再繼續。此附加元件的 Hermes 0.22.5 會在第一次使用時自動載入插件後端，通常**不需要重載 Dashboard**。只有頁面持續顯示「外掛 API 尚未載入」時，才在此頁點 **重載 Dashboard → 確認重載**；等頁面恢復，不需進入 PaaS 或重新啟動整台 HA。
 5. 待 runtime 下載及啟動完成，產生配對連結，再點 **開啟 Paseo**。官方介面在新分頁開啟；配對連結具有存取能力，請勿公開貼出。
 6. 在官方 Paseo 按 **Connect** 完成配對。全新裝置若顯示 **No projects yet**，先按 **Add project → New directory**，父目錄填 `/opt/data`，按 **Use this parent**，再填自己的專案目錄名稱並按 Enter；也可用 **Search for directory** 選已有目錄。目錄位於 Hermes 主機，不是目前瀏覽器的電腦。
