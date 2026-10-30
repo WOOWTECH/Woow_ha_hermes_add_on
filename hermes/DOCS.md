@@ -153,7 +153,7 @@ be reconnected. The old permissive issuer override is not reapplied.
 
 若配對／重載回報拒絕，先確認 `paseo_ingress_url` 的 scheme、主機與 port 全部符合目前瀏覽器網址，並重新啟動附加元件使設定生效。不要關閉來源驗證或把 ingress token 填進設定。錯誤或缺少模型憑證、額度不足，不會因重載 Dashboard 而修復。
 
-HA 0.1.11 的實機完整對話驗收使用 rc.4；rc.5 的新增模型檢查已在 PaaS 的插件發起對話中驗證。rc.6 於 2026-10-28 在 HAOS 實機以 Supervisor 及 Plugins 頁相同的 API 驗證安裝、確認重載、移除，以及附加元件重啟後自動恢復；未涵蓋瀏覽器操作、與官方 Paseo 的配對和模型對話，這部分仍以 rc.4 的實機結果為準。從 Paseo Web 直接建立的對話仍須核對實際模型；若模型不可用，上游可能改用供應商預設模型。
+HA 0.1.11 的實機完整對話驗收使用 rc.4；rc.5 的新增模型檢查已在 PaaS 的插件發起對話中驗證。rc.6 於 2026-10-28 在 HAOS 實機以 Supervisor 及 Plugins 頁相同的 API 驗證安裝、確認重載、移除，以及附加元件重啟後自動恢復；未涵蓋瀏覽器操作、與官方 Paseo 的配對和模型對話，這部分仍以 rc.4 的實機結果為準。rc.9 於 2026-10-30 在同一台 HAOS 實機以相同的 API 驗證：add-on 自 0.1.13 升到 0.1.14（42 秒、state started、選項鍵全部保留、其他 add-on 未受影響），容器換版後**插件自行恢復**（phase 由 installing 回到 running、daemon reachable）；以 commit 安裝 rc.9（Plugins API 的 ref 只接受完整 40 碼 commit SHA，不接受 tag）；確認重載（12–13 秒、generation 更新）；**在 daemon 執行中**從 Plugins API 移除，`paseo.pid` 與 local credential 隨之消失，證實轉接檔在來源被刪除前已停掉 daemon；再安裝並重載後 `/api/plugins/hermes-paseo/status` 的 `originAdoption` 回報 `ORIGIN_CURRENT`。rc.9 未涵蓋的部分與 rc.6 相同。從 Paseo Web 直接建立的對話仍須核對實際模型；若模型不可用，上游可能改用供應商預設模型。
 
 完整插件教學與目前驗收範圍：[Hermes Paseo plugin](https://github.com/WOOWTECH/hermes-paseo-plugin)。
 
