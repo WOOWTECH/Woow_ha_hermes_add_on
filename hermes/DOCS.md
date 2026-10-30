@@ -156,3 +156,23 @@ be reconnected. The old permissive issuer override is not reapplied.
 HA 0.1.11 的實機完整對話驗收使用 rc.4；rc.5 的新增模型檢查已在 PaaS 的插件發起對話中驗證。rc.6 於 2026-10-28 在 HAOS 實機以 Supervisor 及 Plugins 頁相同的 API 驗證安裝、確認重載、移除，以及附加元件重啟後自動恢復；未涵蓋瀏覽器操作、與官方 Paseo 的配對和模型對話，這部分仍以 rc.4 的實機結果為準。從 Paseo Web 直接建立的對話仍須核對實際模型；若模型不可用，上游可能改用供應商預設模型。
 
 完整插件教學與目前驗收範圍：[Hermes Paseo plugin](https://github.com/WOOWTECH/hermes-paseo-plugin)。
+
+
+<a id="omnigent-plugin"></a>
+
+## Omnigent 插件（選用）
+
+插件 [`WOOWTECH/hermes-omnigent-plugin`](https://github.com/WOOWTECH/hermes-omnigent-plugin) 讓 Hermes 連到 Omnigent server，並在這台主機上開啟 Omnigent 對話。它**不隨附加元件安裝或升級**，也不會自動啟用，需要時才在 Hermes 的 **Plugins** 頁安裝。
+
+先備妥：可從這台 Home Assistant 連到的 Omnigent server（HTTPS 網址）與帳號、密碼；Hermes 已設好可用的模型與額度；`/opt/data` 有約 1 GB 可用空間。
+
+1. 進入 Hermes → **Plugins**，在 Git URL or owner/repo 填入 `WOOWTECH/hermes-omnigent-plugin`，安裝並啟用。來源為公開 GitHub，不需要 token。Hermes 會警告這是未經審核的自訂來源（`Custom (unreviewed) source`），這是非官方目錄來源的一般提示；若另外顯示執行程序的 caution，處理方式同 Paseo 一節。
+2. 此附加元件的 Hermes 0.22.5 會在第一次使用時自動載入插件後端，**不需要重載 Dashboard**。重新整理瀏覽器後開啟插件的配對面板。
+3. 在 HAOS 上，配對面板一開始會停在 `SANDBOX_NAMESPACE_UNAVAILABLE`：附加元件的容器不允許插件用來隔離對話的 Bubblewrap 命名空間（其他安裝方式若允許，不會出現這個狀態，也不需勾選）。要繼續，在配對面板勾選 **允許 Hermes 直接執行**。這只讓此插件的 Hermes 原生對話以 `sandbox=none` 執行，沿用這個容器原本的檔案與網路權限；其他引擎的隔離不變。這是明確的授權決定，不是預設值，每次新登入或重新啟用都要重新勾選。
+4. 輸入 Server、帳號與密碼。插件接著在 `/opt/data/omnigent-plugin` 建立私有執行環境（uv、Python 與固定的 Omnigent 0.16.0，約 0.5 GB，測試時 20 至 30 秒），連上 server，並要求每個現有引擎都實際回覆才標記為就緒。此容器內通常只有 Hermes 一個引擎，插件不會補裝 Claude Code、Codex 或 Pi。密碼提交後即清除，不寫入對話或插件狀態。
+
+私有執行環境、新對話的轉送進度與 Omnigent 登入 token 都在 `/opt/data/omnigent-plugin`。依上面「Data」一節的規則它會進附加元件備份（多約 0.5 GB，並含登入 token），備份檔請當成機密保管。
+
+移除：已配對時，先在插件的設定頁按 **取消連結**，再從 Hermes 的 Plugins 頁移除插件。移除**不會**刪除 `/opt/data/omnigent-plugin`，而且移除後附加元件仍在運行時，刪掉該目錄會立刻有幾個小狀態檔被重新建出來（測試時重載 Dashboard 沒有改善，重新啟動附加元件後才停止）。要完全清除：移除插件 → 重新啟動此附加元件 → 刪除 `/opt/data/omnigent-plugin`。
+
+驗證範圍：2026-10-30 在 HAOS 實機（附加元件 0.1.13、Hermes 0.22.5），以 Plugins 頁相同的 API 安裝並啟用插件 v0.1.0-rc.13（commit `bc8c5250`）。插件後端與介面檔案立即可用（Hermes 記錄 `Hot-mounted plugin API routes`），狀態停在 `SANDBOX_NAMESPACE_UNAVAILABLE`；以直接執行授權對一個不存在的 server 配對，私有執行環境與相容層建置成功，接著登入如預期失敗（`SERVER_UNREACHABLE`）；以相同 API 移除插件，並依上述順序清除。**未涵蓋**：瀏覽器操作與配對面板畫面、與真實 Omnigent server 的配對、引擎與模型對話驗證、插件更新。完整說明與驗收範圍：[Hermes Omnigent plugin](https://github.com/WOOWTECH/hermes-omnigent-plugin)。
