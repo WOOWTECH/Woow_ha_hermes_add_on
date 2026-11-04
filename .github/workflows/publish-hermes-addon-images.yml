@@ -91,6 +91,15 @@ jobs:
         with:
           component: woow-hermes
           image: ha-hermes-candidate:smoke
+      # The same image is the new version of the upgrade test (pipeline
+      # #143, category 2): saved and uploaded as artifact
+      # upgrade-comparison-image-woow-hermes-attempt-<run attempt>,
+      # so the comparison neither rebuilds it nor needs a PR tag on GHCR.
+      - name: Image for the upgrade test
+        uses: WOOWTECH/Woow_HA_App_Store/.github/actions/addon-image@main
+        with:
+          component: woow-hermes
+          image: ha-hermes-candidate:smoke
       - name: Check real image exec boundary and normal s6 boot
         run: python3 hermes/test/test-exec-boundary-image.py ha-hermes-candidate:smoke
       - name: Check scoped prompt GC with the real image SessionDB
@@ -126,6 +135,10 @@ jobs:
   # required_workflows) still succeeds. Reported as
   # "Upgrade comparison / compare". The candidate and the published image are
   # both built without a layer cache, so the SBOM is of what the Release ships.
+  # The upgrade test (#137, #143) starts the Release's GHCR image, then this
+  # PR's image (the amd64 build's image artifact) on the same /data and map
+  # directories; a new version that does not start blocks. Startup only, no
+  # data check yet. After a version bump it also waits for this run's image.
   upgrade-comparison:
     name: Upgrade comparison
     permissions:
@@ -134,6 +147,7 @@ jobs:
     uses: WOOWTECH/Woow_HA_App_Store/.github/workflows/woow-addon-upgrade-check.yml@main
     with:
       sbom_artifact: upgrade-comparison-sbom-*
+      image_artifact: upgrade-comparison-image-*
 
   publish:
     name: Publish amd64 image
