@@ -1,7 +1,7 @@
 ## 0.1.15
 
 - Refresh the reviewed Paseo host-adapter provenance to `v0.1.5-rc.3` at exact commit `7b9c88d032672f688c88df222e384ce3bc1af2f2`. The four packaged host files are byte-identical to 0.1.14; the add-on still does not bundle, install, enable, update, pair or configure the separately managed plugin.
-- Document reproducible optional install/update commands for Paseo `v0.1.5-rc.3` and Omnigent `v0.1.0-rc.21` at their released full commit SHAs. Normal updates preserve plugin state, login and consent; the guide explicitly avoids `--force` and keeps pairing user-driven.
+- Document reproducible optional installs for Paseo `v0.1.5-rc.3` and Omnigent `v0.1.0-rc.21` at their released full commit SHAs. Hermes 0.22.5 returns `already_installed` instead of updating an existing plugin with the same non-force install command, so exact updates now use a clean in-place `git fetch` plus `git merge --ff-only`, followed by Dashboard reload. Omnigent is never updated by replacing its checkout.
 - Keep Paseo on the plugin's Hermes-compatible runtime `0.11.2-r3-523d451cc096`; do not upgrade it to incompatible runtime `0.17.4`. No add-on option, port, architecture, credential, login, history or data migration changes.
 
 ## 0.1.14

@@ -137,17 +137,18 @@ be reconnected. The old permissive issuer override is not reapplied.
 
 <a id="paseo-remote-plugin-ha-ingress"></a>
 
-## Paseo 插件與 Dashboard 重載（0.1.11 起）
+## Agent Connect（Paseo 協定）與 Dashboard 重載（0.1.11 起）
 
 附加元件包含 Paseo 的主機介面。插件仍由使用者在 Hermes 的 **Plugins** 頁安裝及啟用，不會因升級附加元件而自動新增插件、開放工具或要求更換模型帳號。
 
 1. 更新附加元件並確認啟動正常。若從 HA 側欄使用 Paseo，在此附加元件的「設定」填入 **Paseo 的 Home Assistant 網址**（`paseo_ingress_url`），例如 `https://ha.example.com` 或 `http://homeassistant.local:8123`。這必須是瀏覽器實際開啟 HA 的來源，不含 `/lovelace`、`/api/hassio_ingress/…`、帳密、query 或 fragment。保存後重啟此附加元件一次。
 2. 保留 **儀表板公開網址**（`public_url`）供 LAN 及 MCP OAuth 使用。兩個入口不同時，不要用 HA 網址取代它。僅使用 LAN Dashboard 時可以留空 `paseo_ingress_url`。
-3. 進入 Hermes → **Plugins**，在 Git URL or owner/repo 填入 `WOOWTECH/hermes-paseo-plugin`，核對來源及權限提示後安裝並啟用。要可重現地安裝或更新目前公開的 `0.1.5-rc.3`，請在附加元件的終端以 Hermes 服務帳號執行 `hermes plugins install WOOWTECH/hermes-paseo-plugin --ref 7b9c88d032672f688c88df222e384ce3bc1af2f2 --enable`（完整 SHA，不用 tag）。不要加 `--force`：一般更新保留插件狀態與同意，強制重裝會刻意使它們失效。來源為公開 GitHub，不需要 GitHub token。此版本固定使用 Paseo runtime `0.11.2-r3-523d451cc096`；不要升到與 Hermes 不相容的 `0.17.4`。
-4. 點 **Paseo**。啟用後主機會自動啟動 Paseo，首次需下載 runtime，通常約一分鐘，網路慢時更久；請等頁面顯示已啟動再繼續。此附加元件的 Hermes 0.22.5 會在第一次使用時自動載入插件後端，通常**不需要重載 Dashboard**。只有頁面持續顯示「外掛 API 尚未載入」時，才在此頁點 **重載 Dashboard → 確認重載**；等頁面恢復，不需進入 PaaS 或重新啟動整台 HA。
-5. 待 runtime 下載及啟動完成，產生配對連結，再點 **開啟 Paseo**。官方介面在新分頁開啟；配對連結具有存取能力，請勿公開貼出。
-6. 在官方 Paseo 按 **Connect** 完成配對。全新裝置若顯示 **No projects yet**，先按 **Add project → New directory**，父目錄填 `/opt/data`，按 **Use this parent**，再填自己的專案目錄名稱並按 Enter；也可用 **Search for directory** 選已有目錄。目錄位於 Hermes 主機，不是目前瀏覽器的電腦。
-7. 按 **New workspace** 並選定 project，接著選擇 Hermes、已登入且有額度的模型和 Default 模式，輸入訊息再按 **Create**。配對 Online、模型清單可見、實際收到模型回覆是不同檢查；模型帳號仍由 Hermes 管理。
+3. 進入 Hermes → **Plugins**，在 Git URL or owner/repo 填入 `WOOWTECH/hermes-paseo-plugin`，核對來源及權限提示後安裝並啟用。要可重現地**新安裝**目前公開的 `0.1.5-rc.3`，可在附加元件容器內以 Hermes 服務帳號執行 `hermes plugins install WOOWTECH/hermes-paseo-plugin --ref 7b9c88d032672f688c88df222e384ce3bc1af2f2 --enable`（完整 SHA，不用 tag）。Hermes 0.22.5 再執行一次此命令不會更新，而會回報 `already_installed`。來源為公開 GitHub，不需要 GitHub token。此版本固定使用 Paseo runtime `0.11.2-r3-523d451cc096`；不要升到與 Hermes 不相容的 `0.17.4`。
+4. 更新既有插件時，先執行 `/paseo stop`，並由具有附加元件容器 shell 權限的管理者以 Hermes 服務帳號進入 `/opt/data/plugins/hermes-paseo`，確認 `git status --porcelain --untracked-files=no` 沒有輸出，再執行 `git fetch origin 7b9c88d032672f688c88df222e384ce3bc1af2f2`、`git merge --ff-only FETCH_HEAD`，最後核對 `git rev-parse HEAD` 是同一完整 SHA。接著從 Agent Connect 執行 **重載 Dashboard → 確認重載**，必要時重新啟用／啟動。不要用 `plugins install --force` 替換 checkout。
+5. 點 **Agent Connect**。啟用後主機會自動啟動 Paseo，首次需下載 runtime，通常約一分鐘，網路慢時更久；請等頁面顯示已啟動再繼續。此附加元件的 Hermes 0.22.5 會在第一次使用時自動載入插件後端，通常**不需要重載 Dashboard**。只有頁面持續顯示「外掛 API 尚未載入」時，才在此頁點 **重載 Dashboard → 確認重載**；等頁面恢復，不需進入 PaaS 或重新啟動整台 HA。
+6. 待 runtime 下載及啟動完成，產生配對連結，再點 **開啟 Agent Connect**。Paseo 官方介面在新分頁開啟；配對連結具有存取能力，請勿公開貼出。
+7. 在官方 Paseo 按 **Connect** 完成配對。全新裝置若顯示 **No projects yet**，先按 **Add project → New directory**，父目錄填 `/opt/data`，按 **Use this parent**，再填自己的專案目錄名稱並按 Enter；也可用 **Search for directory** 選已有目錄。目錄位於 Hermes 主機，不是目前瀏覽器的電腦。
+8. 按 **New workspace** 並選定 project，接著選擇 Hermes、已登入且有額度的模型和 Default 模式，輸入訊息再按 **Create**。配對 Online、模型清單可見、實際收到模型回覆是不同檢查；模型帳號仍由 Hermes 管理。
 
 停用或移除插件時，從 Hermes 原生 Plugins 頁操作，主機先停止插件擁有的 Paseo daemon。從 CLI 移除時請先執行 `/paseo stop`。手動停止狀態、配對、模型登入與對話保存在 `/opt/data`，附加元件重啟會保留。原生 `file` 工具集需管理者另行開啟，安裝插件不會自動擴大模型權限。
 
@@ -166,10 +167,11 @@ HA 0.1.11 的實機完整對話驗收使用 rc.4；rc.5 的新增模型檢查已
 
 先備妥：可從這台 Home Assistant 連到的 Omnigent server（HTTPS 網址）與帳號、密碼；Hermes 已設好可用的模型與額度；`/opt/data` 有約 1 GB 可用空間。插件目前的 server 契約測試涵蓋 Omnigent 0.16.0、0.19.1、0.20.0；另一個 Woow Omnigent add-on 0.1.18 仍內建 Omnigent 0.12.0，不能把兩個 add-on 配對視為已驗證的組合。
 
-1. 進入 Hermes → **Plugins**，在 Git URL or owner/repo 填入 `WOOWTECH/hermes-omnigent-plugin`，安裝並啟用。要可重現地安裝或更新目前公開的 `0.1.0-rc.21`，請在附加元件的終端以 Hermes 服務帳號執行 `hermes plugins install WOOWTECH/hermes-omnigent-plugin --ref 84e0c41ce91594908a53c91fcff09123ca92f626 --enable`。不要加 `--force`：一般 Git 更新保留登入與同意，強制重裝會刻意要求重新配對。來源為公開 GitHub，不需要 token。Hermes 會警告這是未經審核的自訂來源（`Custom (unreviewed) source`），這是非官方目錄來源的一般提示；若另外顯示執行程序的 caution，處理方式同 Paseo 一節。
-2. 此附加元件的 Hermes 0.22.5 會在第一次使用時自動載入插件後端，**不需要重載 Dashboard**。重新整理瀏覽器後開啟插件的配對面板。
-3. 在 HAOS 上，配對面板一開始會停在 `SANDBOX_NAMESPACE_UNAVAILABLE`：附加元件的容器不允許插件用來隔離對話的 Bubblewrap 命名空間（其他安裝方式若允許，不會出現這個狀態，也不需勾選）。要繼續，在配對面板勾選 **允許 Hermes 直接執行**。這只讓此插件的 Hermes 原生對話以 `sandbox=none` 執行，沿用這個容器原本的檔案與網路權限；其他引擎的隔離不變。這是明確的授權決定，不是預設值，每次新登入或重新啟用都要重新勾選。
-4. 輸入 Server、帳號與密碼。插件接著在 `/opt/data/omnigent-plugin` 建立私有執行環境（uv、Python 與固定的 Omnigent 0.20.0，約 0.5 GB；首次下載在慢速 HAOS 上可能需要數分鐘），連上 server，並要求每個現有引擎都實際回覆才標記為就緒。此容器內通常只有 Hermes 一個引擎，插件不會補裝 Claude Code、Codex 或 Pi。密碼提交後即清除，不寫入對話或插件狀態。
+1. 進入 Hermes → **Plugins**，在 Git URL or owner/repo 填入 `WOOWTECH/hermes-omnigent-plugin`，安裝並啟用。要可重現地**新安裝**目前公開的 `0.1.0-rc.21`，可在附加元件容器內以 Hermes 服務帳號執行 `hermes plugins install WOOWTECH/hermes-omnigent-plugin --ref 84e0c41ce91594908a53c91fcff09123ca92f626 --enable`。Hermes 0.22.5 再執行此安裝命令不會更新，而會回報 `already_installed`。來源為公開 GitHub，不需要 token。Hermes 會警告這是未經審核的自訂來源（`Custom (unreviewed) source`），這是非官方目錄來源的一般提示；若另外顯示執行程序的 caution，處理方式同 Agent Connect 一節。
+2. 更新既有 Omnigent 時，不可替換 checkout。由具有附加元件容器 shell 權限的管理者以 Hermes 服務帳號進入 `/opt/data/plugins/hermes-omnigent`，確認 `git status --porcelain --untracked-files=no` 沒有輸出，再執行 `git fetch origin 84e0c41ce91594908a53c91fcff09123ca92f626`、`git merge --ff-only FETCH_HEAD`，最後核對 `git rev-parse HEAD` 是同一完整 SHA；接著從 Dashboard 重載並重新整理瀏覽器。這條路徑保留 Omnigent 用 `.git/config` mtime 辨識的安裝身分；`plugins install --force` 會建立新身分，必須重新登入並重新同意直接執行。
+3. 此附加元件的 Hermes 0.22.5 會在第一次使用時自動載入插件後端，**不需要重載 Dashboard**。重新整理瀏覽器後開啟插件的配對面板。
+4. 在 HAOS 上，配對面板一開始會停在 `SANDBOX_NAMESPACE_UNAVAILABLE`：附加元件的容器不允許插件用來隔離對話的 Bubblewrap 命名空間（其他安裝方式若允許，不會出現這個狀態，也不需勾選）。要繼續，在配對面板勾選 **允許 Hermes 直接執行**。這只讓此插件的 Hermes 原生對話以 `sandbox=none` 執行，沿用這個容器原本的檔案與網路權限；其他引擎的隔離不變。這是明確的授權決定，不是預設值，每次新登入或重新啟用都要重新勾選。
+5. 輸入 Server、帳號與密碼。插件接著在 `/opt/data/omnigent-plugin` 建立私有執行環境（uv、Python 與固定的 Omnigent 0.20.0，約 0.5 GB；首次下載在慢速 HAOS 上可能需要數分鐘），連上 server，並要求每個現有引擎都實際回覆才標記為就緒。此容器內通常只有 Hermes 一個引擎，插件不會補裝 Claude Code、Codex 或 Pi。密碼提交後即清除，不寫入對話或插件狀態。
 
 技能驗收：在 Omnigent 中要求 Hermes 明確建立一個只含測試標記的 skill，確認該檔案出現在此附加元件 `/opt/data/skills/`；再開新 Omnigent 對話及 Hermes 原生對話，分別要求調用該 skill，核對回覆中的測試標記。插件必須包含 `skills.create_dir` 指向 profile 的修正才可用此流程驗收；僅有 rc.18 的 `skills.external_dirs` 只能讀取既有技能。測後從 Hermes Skills 頁刪除測試 skill。對話技能異動帳本與主 profile 帳本目前仍分開。
 
